@@ -4,6 +4,9 @@ set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 project(BabylonNative)
 
+# HACK for Office (https://devblogs.microsoft.com/cppblog/making-cpp-exception-handling-smaller-x64)
+add_compile_options(/d2FH4-)
+
 if (APPLE)
     # without this option on azure pipelines, there is a mismatch with math.h giving a lot of undefined functions on macOS.
     # only enabled for Apple as there is no issue for UWP/WIN32
