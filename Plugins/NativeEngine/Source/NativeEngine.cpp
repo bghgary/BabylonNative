@@ -559,11 +559,13 @@ namespace Babylon
         std::vector<uint8_t> m_bytes{};
     };
 
-    void NativeEngine::InitializeWindow(void* nativeWindowPtr, uint32_t width, uint32_t height)
+    void NativeEngine::InitializeWindow(void* nativeWindowPtr, void* contextPtr, void* backBufferPtr, uint32_t width, uint32_t height)
     {
         // Initialize bgfx.
         bgfx::Init init{};
         init.platformData.nwh = nativeWindowPtr;
+        init.platformData.context = contextPtr;
+        init.platformData.backBuffer = backBufferPtr;
         bgfx::setPlatformData(init.platformData);
 #if (ANDROID)
         init.type = bgfx::RendererType::OpenGLES;

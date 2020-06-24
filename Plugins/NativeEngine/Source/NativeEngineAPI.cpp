@@ -7,7 +7,12 @@ namespace Babylon::Plugins::NativeEngine
 {
     void InitializeGraphics(void* windowPtr, size_t width, size_t height)
     {
-        Babylon::NativeEngine::InitializeWindow(windowPtr, static_cast<uint32_t>(width), static_cast<uint32_t>(height));
+        Babylon::NativeEngine::InitializeWindow(windowPtr, nullptr, nullptr, static_cast<uint32_t>(width), static_cast<uint32_t>(height));
+    }
+
+    void InitializeGraphics(void* windowPtr, void* contextPtr, void* backBufferPtr, size_t width, size_t height)
+    {
+       Babylon::NativeEngine::InitializeWindow(windowPtr, contextPtr, backBufferPtr, static_cast<uint32_t>(width), static_cast<uint32_t>(height));
     }
 
     void Initialize(Napi::Env env)
