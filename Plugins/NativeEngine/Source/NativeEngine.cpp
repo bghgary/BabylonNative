@@ -1179,7 +1179,7 @@ namespace Babylon
 
     void NativeEngine::SetTexture(const Napi::CallbackInfo& info)
     {
-        bgfx::Encoder* encoder{BeginUpdate()};
+        bgfx::Encoder* encoder{BeginUpdate().Encoder()};
 
         const auto uniformInfo = info[0].As<Napi::External<UniformInfo>>().Data();
         const auto texture = info[1].As<Napi::External<TextureData>>().Data();
@@ -1262,7 +1262,7 @@ namespace Babylon
 
     void NativeEngine::DrawIndexed(const Napi::CallbackInfo& info)
     {
-        bgfx::Encoder* encoder{BeginUpdate()};
+        bgfx::Encoder* encoder{BeginUpdate().Encoder()};
 
         const auto fillMode = info[0].As<Napi::Number>().Int32Value();
         const auto indexStart = info[1].As<Napi::Number>().Int32Value();
@@ -1293,7 +1293,7 @@ namespace Babylon
 
     void NativeEngine::Draw(const Napi::CallbackInfo& info)
     {
-        bgfx::Encoder* encoder{BeginUpdate()};
+        bgfx::Encoder* encoder{BeginUpdate().Encoder()};
 
         const auto fillMode = info[0].As<Napi::Number>().Int32Value();
         const auto verticesStart = info[1].As<Napi::Number>().Int32Value();
@@ -1512,10 +1512,15 @@ namespace Babylon
         m_graphicsImpl.BoundFrameBuffer().Submit(encoder, m_currentProgram->Handle);
     }
 
-    bgfx::Encoder* NativeEngine::BeginUpdate()
+    Graphics::Impl::UpdateToken& NativeEngine::BeginUpdate()
     {
-        ScheduleFrame();
-        return m_graphicsImpl.GetUpdateTokenForThread().Begin();
+        if (!m_updateToken.has_value())
+        {
+            m_updateToken.emplace(m_graphicsImpl.RequestUpdateToken());
+            ScheduleFrame();
+        }
+
+        return *m_updateToken;
     }
 
     void NativeEngine::ScheduleFrame()
@@ -1527,10 +1532,9 @@ namespace Babylon
 
         m_frameScheduled = true;
 
-        auto& updateToken{m_graphicsImpl.GetUpdateTokenForThread()};
-        arcana::make_task(m_graphicsImpl.BeforeRenderScheduler(), m_cancelSource, [this, &updateToken]() {
-            updateToken.Lock();
-        }).then(m_runtimeScheduler, m_cancelSource, [this, &updateToken]() {
+        arcana::make_task(m_graphicsImpl.BeforeRenderScheduler(), m_cancelSource, [this]() {
+            BeginUpdate();
+        }).then(m_runtimeScheduler, m_cancelSource, [this]() {
             m_frameScheduled = false;
 
             auto callbacks{std::move(m_requestAnimationFrameCallbacks)};
@@ -1539,8 +1543,7 @@ namespace Babylon
                 callback.Value().Call({});
             }
 
-            updateToken.End();
-            updateToken.Unlock();
+            m_updateToken.reset();
         });
 
         // TODO: check if error handling is necessary

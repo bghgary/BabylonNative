@@ -23,6 +23,7 @@
 #include <arcana/containers/weak_table.h>
 #include <arcana/threading/cancellation.h>
 #include <unordered_map>
+#include <optional>
 
 namespace Babylon
 {
@@ -204,7 +205,7 @@ namespace Babylon
 
         void Draw(bgfx::Encoder* encoder, int fillMode);
 
-        bgfx::Encoder* BeginUpdate();
+        Graphics::Impl::UpdateToken& BeginUpdate();
         void ScheduleFrame();
 
         arcana::cancellation_source m_cancelSource{};
@@ -215,9 +216,10 @@ namespace Babylon
         arcana::weak_table<std::unique_ptr<ProgramData>> m_programDataCollection{};
 
         JsRuntime& m_runtime;
-        Graphics::Impl& m_graphicsImpl;
-
         JsRuntimeScheduler m_runtimeScheduler;
+
+        Graphics::Impl& m_graphicsImpl;
+        std::optional<Graphics::Impl::UpdateToken> m_updateToken{};
 
         bool m_frameScheduled{};
 

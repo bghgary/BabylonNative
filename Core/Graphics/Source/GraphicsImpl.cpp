@@ -28,41 +28,6 @@ namespace
 
 namespace Babylon
 {
-    Graphics::Impl::UpdateToken::UpdateToken(std::shared_mutex& mutex)
-        : m_mutex{mutex}
-    {
-    }
-
-    void Graphics::Impl::UpdateToken::Lock()
-    {
-        m_mutex.lock_shared();
-    }
-
-    void Graphics::Impl::UpdateToken::Unlock()
-    {
-        m_mutex.unlock_shared();
-    }
-
-    bgfx::Encoder* Graphics::Impl::UpdateToken::Begin()
-    {
-        if (m_encoder == nullptr)
-        {
-            m_encoder = bgfx::begin(true);
-            assert(m_encoder != nullptr);
-        }
-
-        return m_encoder;
-    }
-
-    void Graphics::Impl::UpdateToken::End()
-    {
-        if (m_encoder != nullptr)
-        {
-            bgfx::end(m_encoder);
-            m_encoder = nullptr;
-        }
-    }
-
     Graphics::Impl::Impl()
     {
         // Set the thread affinity (all other rendering operations must happen on this thread).
@@ -205,10 +170,9 @@ namespace Babylon
         m_afterRenderScheduler.m_dispatcher.tick(m_cancellationSource);
     }
 
-    Graphics::Impl::UpdateToken& Graphics::Impl::GetUpdateTokenForThread()
+    Graphics::Impl::UpdateToken Graphics::Impl::RequestUpdateToken()
     {
-        std::scoped_lock lock{m_updateTokensMutex};
-        return m_updateTokens.try_emplace(std::this_thread::get_id(), m_updateMutex).first->second;
+        return {*this};
     }
 
     void Graphics::Impl::SetDiagnosticOutput(std::function<void(const char* output)> diagnosticOutput)
@@ -266,6 +230,32 @@ namespace Babylon
         return m_callback;
     }
 
+    bgfx::Encoder* Graphics::Impl::GetEncoderForThread()
+    {
+        std::scoped_lock lock{m_encodersMutex};
+
+        auto id{std::this_thread::get_id()};
+        auto it{m_encoders.find(id)};
+        if (it == m_encoders.end())
+        {
+            it = m_encoders.emplace(id, bgfx::begin(true)).first;
+        }
+
+        return it->second;
+    }
+
+    void Graphics::Impl::EndAllEncoders()
+    {
+        std::unique_lock lock{m_encodersMutex};
+
+        for (auto& pair : m_encoders)
+        {
+            bgfx::end(pair.second);
+        }
+
+        m_encoders.clear();
+    }
+
     void Graphics::Impl::UpdateBgfxState()
     {
         std::scoped_lock lock{m_state.Mutex};
@@ -306,6 +296,9 @@ namespace Babylon
     void Graphics::Impl::Frame()
     {
         std::unique_lock lock{m_updateMutex};
+
+        // Automatically end all the encoders.
+        EndAllEncoders();
 
         // Check for bgfx views that only called clear and not submit.
         m_frameBufferManager->Check();

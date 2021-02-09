@@ -23,33 +23,29 @@ namespace Babylon
         class UpdateToken final
         {
         public:
-            // Must be called from update thread.
-            explicit UpdateToken(std::shared_mutex& mutex);
-
-            UpdateToken(const UpdateToken&) = delete;
-            UpdateToken(UpdateToken&&) = delete;
-
-            // May be called from any thread.
-            void Lock();
-            void Unlock();
-
-            // Must be called from update thread.
-            bgfx::Encoder* Begin();
-            void End();
+            bgfx::Encoder* Encoder()
+            {
+                return m_impl.GetEncoderForThread();
+            }
 
         private:
             friend class Impl;
 
-            std::shared_mutex& m_mutex;
-            bgfx::Encoder* m_encoder{};
+            UpdateToken(Impl& impl)
+                : m_impl{impl}
+                , m_lock{impl.m_updateMutex}
+            {
+            }
+
+            Impl& m_impl;
+            std::shared_lock<std::shared_mutex> m_lock{};
         };
 
         class RenderScheduler final
         {
         public:
             template<typename CallableT>
-            void operator()(CallableT&& callable)
-            {
+            void operator()(CallableT&& callable) {
                 m_dispatcher(callable);
             }
 
@@ -78,7 +74,7 @@ namespace Babylon
         void StartRenderingCurrentFrame();
         void FinishRenderingCurrentFrame();
 
-        UpdateToken& GetUpdateTokenForThread();
+        UpdateToken RequestUpdateToken();
 
         void SetDiagnosticOutput(std::function<void(const char* output)> diagnosticOutput);
 
@@ -93,6 +89,9 @@ namespace Babylon
         BgfxCallback& Callback();
 
     private:
+        bgfx::Encoder* GetEncoderForThread();
+        void EndAllEncoders();
+
         void UpdateBgfxState();
         void UpdateBgfxResolution();
         void DiscardIfDirty();
@@ -131,7 +130,7 @@ namespace Babylon
 
         std::unique_ptr<FrameBufferManager> m_frameBufferManager{};
 
-        std::mutex m_updateTokensMutex{};
-        std::map<std::thread::id, UpdateToken> m_updateTokens{};
+        std::mutex m_encodersMutex{};
+        std::map<std::thread::id, bgfx::Encoder*> m_encoders{};
     };
 }
