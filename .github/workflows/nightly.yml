@@ -1,0 +1,60 @@
+name: Nightly build
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: 0 23 * * 1-5
+
+jobs:
+  build:
+    runs-on: windows-latest
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@master
+      with:
+        submodules: 'recursive'
+    - name: Download babylon.max.js
+      run: curl.exe -o Apps/node_modules/babylonjs/babylon.max.js --create-dirs https://preview.babylonjs.com/babylon.max.js
+    - name: Download babylon.max.js.map
+      run: curl.exe -o Apps/node_modules/babylonjs/babylon.max.js.map --create-dirs https://preview.babylonjs.com/babylon.max.js.map
+    - name: Download babylonjs.materials.js
+      run: curl.exe -o Apps/node_modules/babylonjs-materials/babylonjs.materials.js --create-dirs https://preview.babylonjs.com/materialsLibrary/babylonjs.materials.js
+    - name: Download babylonjs.materials.js.map
+      run: curl.exe -o Apps/node_modules/babylonjs-materials/babylonjs.materials.js.map --create-dirs https://preview.babylonjs.com/materialsLibrary/babylonjs.materials.js.map
+    - name: Download babylon.loaders.js
+      run: curl.exe -o Apps/node_modules/babylonjs-loaders/babylonjs.loaders.js --create-dirs https://preview.babylonjs.com/loaders/babylonjs.loaders.js
+    - name: Download babylon.loaders.js.map
+      run: curl.exe -o Apps/node_modules/babylonjs-loaders/babylonjs.loaders.js.map --create-dirs https://preview.babylonjs.com/loaders/babylonjs.loaders.js.map
+    - name: Download babylon.gui.js
+      run: curl.exe -o Apps/node_modules/babylonjs-gui/babylon.gui.js --create-dirs https://preview.babylonjs.com/gui/babylon.gui.js
+    - name: Download babylon.gui.js.map
+      run: curl.exe -o Apps/node_modules/babylonjs-gui/babylon.gui.js.map --create-dirs https://preview.babylonjs.com/gui/babylon.gui.js.map
+    - name: View Apps\node_modules content
+      run: Get-ChildItem -Path .\Apps\node_modules -Recurse
+    - name: Make Solution
+      run: mkdir buildWin32_x64 && 
+        cd buildWin32_x64 &&
+        cmake -G "Visual Studio 16 2019" -A x64 -DBGFX_CONFIG_MEMORY_TRACKING=ON -DBGFX_CONFIG_DEBUG=ON ..
+    - name: Add msbuild to PATH
+      uses: microsoft/setup-msbuild@v1.0.2
+    - name: Build Win32
+      run: msbuild buildWin32_x64/BabylonNative.sln -p:Configuration="RelWithDebInfo" -p:Platform=x64 
+    - name: Run Validation Tests
+      run: |
+          ValidationTests.exe
+      shell: cmd
+      working-directory: buildWin32_x64/Apps/ValidationTests/RelWithDebInfo
+    - name: Upload Errors images artifact
+      uses: actions/upload-artifact@v2
+      if: failure()
+      with:
+          name: ErrorImages
+          path: |
+            buildWin32_x64/Apps/ValidationTests/Errors
+    - name: Upload Result images artifact
+      uses: actions/upload-artifact@v2
+      with:
+          name: ResultImages
+          path: |
+            buildWin32_x64/Apps/ValidationTests/Results

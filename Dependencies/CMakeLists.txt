@@ -19,22 +19,25 @@ target_include_directories(base-n INTERFACE "base-n/include")
 
 # -------------------------------- bgfx.cmake --------------------------------
 # Dependencies: none
-add_compile_definitions(BGFX_CONFIG_DEBUG_UNIFORM=0)
-add_compile_definitions(BGFX_CONFIG_MULTITHREADED=0)
-add_compile_definitions(BGFX_CONFIG_MAX_VERTEX_STREAMS=32)
-add_compile_definitions(BGFX_CONFIG_MAX_COMMAND_BUFFER_SIZE=12582912)
-if(APPLE)
-    # no Vulkan on Apple but Metal
-    add_compile_definitions(BGFX_CONFIG_RENDERER_VULKAN=0)
-    add_compile_definitions(BGFX_CONFIG_RENDERER_METAL=1)
-elseif(ANDROID)
-    add_compile_definitions(BGFX_CONFIG_RENDERER_OPENGLES=30)
-elseif(UNIX)
-    add_compile_definitions(BGFX_CONFIG_RENDERER_OPENGL=33)
-endif()
 set(BGFX_BUILD_EXAMPLES OFF CACHE BOOL "Build the BGFX examples.")
 set(BGFX_BUILD_TOOLS OFF CACHE BOOL "Build the BGFX tools.")
+set(BGFX_USE_DEBUG_SUFFIX OFF CACHE BOOL "Add 'd' suffix to debug output targets")
 add_subdirectory(bgfx.cmake)
+target_compile_definitions(bgfx PRIVATE BGFX_CONFIG_DEBUG_UNIFORM=0)
+target_compile_definitions(bgfx PRIVATE BGFX_CONFIG_MULTITHREADED=1)
+target_compile_definitions(bgfx PRIVATE BGFX_CONFIG_MAX_VERTEX_STREAMS=32)
+target_compile_definitions(bgfx PRIVATE BGFX_CONFIG_MAX_COMMAND_BUFFER_SIZE=12582912)
+if(APPLE)
+    # no Vulkan on Apple but Metal
+    target_compile_definitions(bgfx PRIVATE BGFX_CONFIG_RENDERER_VULKAN=0)
+    target_compile_definitions(bgfx PRIVATE BGFX_CONFIG_RENDERER_METAL=1)
+    target_compile_definitions(bgfx PRIVATE BGFX_CONFIG_WAIT_FOR_FLIP=1)
+elseif(ANDROID)
+    target_compile_definitions(bgfx PRIVATE BGFX_CONFIG_RENDERER_OPENGLES=30)
+    target_compile_definitions(bgfx PRIVATE BGFX_GL_CONFIG_TEXTURE_READ_BACK_EMULATION=1)
+elseif(UNIX)
+    target_compile_definitions(bgfx PRIVATE BGFX_CONFIG_RENDERER_OPENGL=33)
+endif()
 set_property(TARGET astc PROPERTY FOLDER Dependencies/bgfx/3rdparty)
 set_property(TARGET astc-codec PROPERTY FOLDER Dependencies/bgfx/3rdparty)
 set_property(TARGET edtaa3 PROPERTY FOLDER Dependencies/bgfx/3rdparty)
@@ -69,13 +72,17 @@ set(ENABLE_HLSL OFF CACHE BOOL "Enables HLSL input support")
 set(ENABLE_OPT OFF CACHE BOOL "Enables spirv-opt capability if present")
 set(BUILD_EXTERNAL OFF CACHE BOOL "Build external dependencies in /External")
 add_subdirectory(glslang)
+set_property(TARGET GenericCodeGen PROPERTY FOLDER Dependencies/glslang)
 set_property(TARGET glslang PROPERTY FOLDER Dependencies/glslang)
 set_property(TARGET OGLCompiler PROPERTY FOLDER Dependencies/glslang)
 set_property(TARGET OSDependent PROPERTY FOLDER Dependencies/glslang)
+set_property(TARGET MachineIndependent PROPERTY FOLDER Dependencies/glslang)
 set_property(TARGET SPIRV PROPERTY FOLDER Dependencies/glslang)
+disable_warnings(GenericCodeGen)
 disable_warnings(glslang)
 disable_warnings(OGLCompiler)
 disable_warnings(OSDependent)
+disable_warnings(MachineIndependent)
 disable_warnings(SPIRV)
 
 # -------------------------------- ios-cmake --------------------------------
@@ -99,8 +106,8 @@ disable_warnings(spirv-cross-hlsl)
 
 # -------------------------------- xr --------------------------------
 # Dependencies: none
-# Currently supported on Windows via OpenXR via ARCore.
-if(WIN32 OR WINDOWS_STORE OR ANDROID)
+# Currently supported on Windows via OpenXR, Android via ARCore, and iOS via ARKit.
+if(WIN32 OR WINDOWS_STORE OR ANDROID OR IOS)
     add_subdirectory(xr)
     set_property(TARGET xr PROPERTY FOLDER Dependencies/xr)
     warnings_as_errors(xr)
@@ -122,3 +129,11 @@ endif()
 # Dependencies: arcana, AndroidExtensions
 add_subdirectory(UrlLib)
 set_property(TARGET UrlLib PROPERTY FOLDER Dependencies)
+
+# --------------------------- v8inspector ---------------------------
+# Dependencies: none
+# Currently only supported on Win32 x86/x64
+if (WIN32 AND NOT (WINDOWS_STORE OR CMAKE_GENERATOR_PLATFORM_UPPER MATCHES "ARM.*"))
+    add_subdirectory(v8inspector)
+    set_property(TARGET v8inspector PROPERTY FOLDER Dependencies)
+endif()

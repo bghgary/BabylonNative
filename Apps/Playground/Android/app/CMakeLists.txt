@@ -42,8 +42,7 @@ set(BABYLON_NATIVE_PLAYGROUND_DIR "${CMAKE_CURRENT_LIST_DIR}/../..")
 add_subdirectory(${BABYLON_NATIVE_PLAYGROUND_DIR}/../../ ${BABYLON_NATIVE_PLAYGROUND_DIR}/../../build/Android_${CMAKE_ANDROID_ARCH_ABI}/)
 
 add_library(BabylonNativeJNI SHARED
-            src/main/cpp/BabylonNativeJNI.cpp
-            ${BABYLON_NATIVE_PLAYGROUND_DIR}/Shared/InputManager.cpp)
+            src/main/cpp/BabylonNativeJNI.cpp)
 
 target_include_directories(BabylonNativeJNI
         PRIVATE
@@ -57,17 +56,20 @@ target_link_libraries(BabylonNativeJNI
         EGL
         log
         -lz
-        AndroidExtensions
         AppRuntime
         NativeEngine
         NativeXr
-        NativeWindow
         Console
+        Canvas
         Window
         ScriptLoader
-        XMLHttpRequest)
+        XMLHttpRequest
+        NativeCamera
+        AndroidExtensions
+        )
 
 configure_file(
     "${ANDROID_NDK}/sources/cxx-stl/llvm-libc++/libs/${ANDROID_ABI}/libc++_shared.so"
     "${CMAKE_CURRENT_LIST_DIR}/src/main/jniLibs/${CMAKE_ANDROID_ARCH_ABI}/libc++_shared.so"
     COPYONLY)
+    

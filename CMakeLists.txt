@@ -1,5 +1,5 @@
-# cmake 3.15.3+ because of a c++ regression when swift is enable
-cmake_minimum_required(VERSION 3.15.3)
+# cmake 3.18+ to have the ARCHIVE_EXTRACT sub-command for files
+cmake_minimum_required(VERSION 3.18)
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 project(BabylonNative)
@@ -34,6 +34,12 @@ add_subdirectory(Dependencies EXCLUDE_FROM_ALL)
 add_subdirectory(Core EXCLUDE_FROM_ALL)
 add_subdirectory(Plugins EXCLUDE_FROM_ALL)
 add_subdirectory(Polyfills EXCLUDE_FROM_ALL)
+
+if(DEFINED EXTENSIONS_DIRS)
+    foreach(extensionDir IN LISTS EXTENSIONS_DIRS)
+        add_subdirectory(${extensionDir} "Extensions" EXCLUDE_FROM_ALL)
+    endforeach()
+endif()
 
 get_directory_property(hasParent PARENT_DIRECTORY)
 if(hasParent)

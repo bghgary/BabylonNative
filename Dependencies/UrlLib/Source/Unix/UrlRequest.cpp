@@ -2,6 +2,8 @@
 #include <arcana/threading/task.h>
 #include <arcana/threading/task_schedulers.h>
 #include <curl/curl.h>
+#include <unistd.h>
+#include <filesystem>
 
 namespace UrlLib
 {
@@ -37,22 +39,21 @@ namespace UrlLib
 
         arcana::task<void, std::exception_ptr> SendAsync()
         {
-            return arcana::make_task(arcana::threadpool_scheduler, m_cancellationSource, [this]()
+            m_taskCompletionSource = {};
+            switch (m_responseType)
             {
-                switch (m_responseType)
+                case UrlResponseType::String:
                 {
-                    case UrlResponseType::String:
-                    {
-                        LoadFile(m_responseString);
-                        break;
-                    }
-                    case UrlResponseType::Buffer:
-                    {
-                        LoadFile(m_responseBuffer);
-                        break;
-                    }
+                    LoadFile(m_responseString);
+                    break;
                 }
-            });
+                case UrlResponseType::Buffer:
+                {
+                    LoadFile(m_responseBuffer);
+                    break;
+                }
+            }
+            return m_taskCompletionSource.as_task();
         }
 
         UrlStatusCode StatusCode() const
@@ -76,6 +77,87 @@ namespace UrlLib
         }
 
     private:
+        struct CurlMulti
+        {
+            CurlMulti()
+            : m_multiHandle(curl_multi_init())
+            {
+                assert(m_multiHandle != nullptr);
+                curl_multi_setopt(m_multiHandle, CURLMOPT_MAX_TOTAL_CONNECTIONS, 200);
+                curl_multi_setopt(m_multiHandle, CURLMOPT_MAX_HOST_CONNECTIONS, 6L);
+                m_thread = std::thread([this](){
+                    Loop();
+                });
+            }
+
+            ~CurlMulti()
+            {
+                m_cancelSource.cancel();
+                m_thread.join();
+                auto errCode = curl_multi_cleanup(m_multiHandle);
+                assert(errCode == CURLM_OK);
+                (void)errCode;
+            }
+
+            void AddHandle(CURL* handle)
+            {
+                std::lock_guard<std::mutex> guard(m_mutex);
+                CURLMcode errCode = curl_multi_add_handle(m_multiHandle, handle); 
+                assert(errCode == CURLM_OK);
+                (void)errCode;
+            }
+
+        private:
+            CURLM* m_multiHandle;
+            // can't add new handle when curl is inside a callback. To be certain, a mutex is used when performing calls.
+            std::mutex m_mutex;
+            arcana::cancellation_source m_cancelSource{};
+            std::thread m_thread;
+            void Loop()
+            {
+                while (!m_cancelSource.cancelled())
+                {
+                    int stillRunning;
+                    int numfds;
+                    int msgsLeft;
+                    if (curl_multi_wait(m_multiHandle, NULL, 0, 1000, &numfds) == CURLM_OK)
+                    {
+                        std::lock_guard<std::mutex> guard(m_mutex);
+                        if (curl_multi_perform(m_multiHandle, &stillRunning) != CURLM_OK)
+                        {
+                            throw std::runtime_error("CURL: Curl Multi perform error.");
+                        }
+                    }
+                    
+                    // See how the transfers went
+                    CURLMsg* m = nullptr;
+                    while ((m = curl_multi_info_read(m_multiHandle, &msgsLeft))) 
+                    {
+                        if (m->msg == CURLMSG_DONE) 
+                        {
+                            CURL* handle = m->easy_handle;
+                            UrlRequest::Impl *request;
+                            curl_easy_getinfo(handle, CURLINFO_PRIVATE, &request);
+                            if (m->data.result == CURLE_OK) 
+                            {
+                                long codep;
+                                curl_easy_getinfo(handle, CURLINFO_RESPONSE_CODE, &codep);
+
+                                // codep 0 for file access
+                                if (codep == 0 || codep == 200) 
+                                {
+                                    request->m_statusCode = UrlStatusCode::Ok;
+                                }
+                            }
+                            request->m_taskCompletionSource.complete();
+
+                            curl_multi_remove_handle(m_multiHandle, handle);
+                            curl_easy_cleanup(handle);
+                        }
+                    }
+                }
+            }
+        };
 
         static void Append(std::string& string, char* buffer, size_t nitems)
         {
@@ -94,7 +176,83 @@ namespace UrlLib
             if (curl)
             {
                 data.clear();
-                curl_easy_setopt(curl, CURLOPT_URL, m_url.data());
+
+                // Curl can't parse URL starting with app://
+                // doing it manually instead
+                const auto appSchema = "app://";
+                if (m_url.find(appSchema) == 0)
+                {
+                    char exe[1024];
+                    int ret = readlink("/proc/self/exe", exe, sizeof(exe)-1);
+                    if(ret == -1)
+                    {
+                        throw std::runtime_error{"Unable to get executable location"};
+                    }
+                    exe[ret] = 0;
+
+                    std::string patchedURL = m_url;
+                    const auto baseURL = std::string("file://") + std::filesystem::path{exe}.parent_path().generic_string();
+                    patchedURL.replace(0, strlen(appSchema), baseURL);
+
+                    curl_easy_setopt(curl, CURLOPT_URL, patchedURL.c_str());
+                }
+                else
+                {
+                    // libCurl doesn't escape url strings automatically.
+                    // Escaping whole URL string results in escaping scheme, host, ... everything
+                    // Moreover, escaping shall not be done for local file path.
+                    // So, escaping only path part of the URL for every URL but file scheme.
+
+                    CURLUcode rc;
+                    CURLU* url = curl_url();
+                    auto urlScopeGuard = gsl::finally([url] { curl_url_cleanup(url); });
+                    rc = curl_url_set(url, CURLUPART_URL, m_url.c_str(), 0);
+                    if (rc != CURLUE_OK)
+                    {
+                        throw std::runtime_error{"CURL: Unable to build URL."};
+                    }
+
+                    char* scheme;
+                    rc = curl_url_get(url, CURLUPART_SCHEME, &scheme, 0);
+                    if (rc != CURLUE_OK)
+                    {
+                        throw std::runtime_error{"CURL: Unable to get URL scheme."};
+                    }
+                    auto schemeScopeGuard = gsl::finally([scheme] { curl_free(scheme); });
+
+                    if (strcmp(scheme, "file"))
+                    {
+                        char* path;
+                        rc = curl_url_get(url, CURLUPART_PATH, &path, 0);
+                        if (rc != CURLUE_OK)
+                        {
+                            throw std::runtime_error{"CURL: Unable to get URL path."};
+                        }
+                        auto pathScopeGuard = gsl::finally([path] { curl_free(path); });
+                        char* pathEscaped = curl_easy_escape(curl, path, 0);
+                        auto pathEscapedScopeGuard = gsl::finally([pathEscaped] { curl_free(pathEscaped); });
+                        rc = curl_url_set(url, CURLUPART_PATH, pathEscaped, 0);
+                        if (rc != CURLUE_OK)
+                        {
+                            throw std::runtime_error{"CURL: Unable to set URL path."};
+                        }
+
+                        char* urlEscaped;
+                        rc = curl_url_get(url, CURLUPART_URL, &urlEscaped, 0);
+                        if (rc != CURLUE_OK)
+                        {
+                            throw std::runtime_error{"CURL: Unable to get URL string."};
+                        }
+
+                        curl_easy_setopt(curl, CURLOPT_URL, urlEscaped);
+                        curl_free(urlEscaped);
+                    }
+                    else
+                    {
+                        curl_easy_setopt(curl, CURLOPT_URL, m_url.c_str());
+                    }
+                }
+
                 curl_easy_setopt(curl, CURLOPT_FOLLOWLOCATION, 1L);
 
                 curl_write_callback callback = [](char* buffer, size_t /*size*/, size_t nitems, void* userData) {
@@ -105,19 +263,14 @@ namespace UrlLib
 
                 curl_easy_setopt(curl, CURLOPT_WRITEFUNCTION, callback);
                 curl_easy_setopt(curl, CURLOPT_WRITEDATA, &data);
-
-                auto result = curl_easy_perform(curl);
-                if (result != CURLE_OK)
-                {
-                    throw std::exception();
-                }
-
-                curl_easy_cleanup(curl);
-                m_statusCode = UrlStatusCode::Ok;
+                curl_easy_setopt(curl, CURLOPT_PRIVATE, this);
+                s_curlMulti.AddHandle(curl);
             }
         }
 
+        static inline CurlMulti s_curlMulti{};
         arcana::cancellation_source m_cancellationSource{};
+        arcana::task_completion_source<void, std::exception_ptr> m_taskCompletionSource{};
         UrlResponseType m_responseType{UrlResponseType::String};
         UrlMethod m_method{UrlMethod::Get};
         UrlStatusCode m_statusCode{UrlStatusCode::None};

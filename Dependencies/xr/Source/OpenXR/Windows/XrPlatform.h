@@ -1,24 +1,26 @@
 #pragma once
 
-#ifdef XR_USE_GRAPHICS_API_D3D11
-#error "XrPlatform.h must not be included more than once."
+#include <d3d11.h>
+
+#ifndef XR_USE_GRAPHICS_API_D3D11
+#define XR_USE_GRAPHICS_API_D3D11
 #endif
 
-#include <d3d11.h>
-#define XR_USE_GRAPHICS_API_D3D11
+#ifndef XR_USE_PLATFORM_WIN32
+#define XR_USE_PLATFORM_WIN32
+#endif
 
 #include <XrPlatformCommon.h>
 #include <XR.h>
-
 #include <array>
 
 namespace xr
 {
-    inline auto CreateGraphicsBinding(XrInstance instance, XrSystemId systemId, void* graphicsDevice)
+    inline auto CreateGraphicsBinding(const ExtensionDispatchTable& extensions, XrInstance instance, XrSystemId systemId, void* graphicsDevice)
     {
         // Create the D3D11 device for the adapter associated with the system.
         XrGraphicsRequirementsD3D11KHR graphicsRequirements{ XR_TYPE_GRAPHICS_REQUIREMENTS_D3D11_KHR };
-        XrCheck(xrGetD3D11GraphicsRequirementsKHR(instance, systemId, &graphicsRequirements));
+        XrCheck(extensions.xrGetD3D11GraphicsRequirementsKHR(instance, systemId, &graphicsRequirements));
 
         XrGraphicsBindingD3D11KHR graphicsBinding{ XR_TYPE_GRAPHICS_BINDING_D3D11_KHR };
         graphicsBinding.device = reinterpret_cast<ID3D11Device*>(graphicsDevice);
@@ -34,8 +36,9 @@ namespace xr
         DXGI_FORMAT_R8G8B8A8_UNORM_SRGB
     };
 
-    constexpr std::array<SwapchainFormat, 1> SUPPORTED_DEPTH_FORMATS
+    constexpr std::array<SwapchainFormat, 2> SUPPORTED_DEPTH_FORMATS
     {
+        DXGI_FORMAT_D16_UNORM,
         DXGI_FORMAT_D24_UNORM_S8_UINT
     };
 
@@ -49,8 +52,10 @@ namespace xr
             return xr::TextureFormat::RGBA8_SRGB;
         case DXGI_FORMAT_D24_UNORM_S8_UINT:
             return xr::TextureFormat::D24S8;
+        case DXGI_FORMAT_D16_UNORM:
+            return xr::TextureFormat::D16;
         default:
-            throw std::exception{ /* Unsupported texture format */ };
+            throw std::runtime_error{ "Unsupported texture format" };
         }
     }
 

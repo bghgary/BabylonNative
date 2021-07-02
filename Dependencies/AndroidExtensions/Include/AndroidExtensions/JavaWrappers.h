@@ -5,6 +5,7 @@
 #include <vector>
 #include <cstddef>
 #include <android/asset_manager.h>
+#include <android/native_window.h>
 
 // --------------------
 // Forward Declarations
@@ -48,6 +49,8 @@ namespace android::content
 namespace android::content::res
 {
     class AssetManager;
+    class Resources;
+    class Configuration;
 }
 
 namespace android::net
@@ -76,16 +79,33 @@ namespace java::lang
         jbyteArray m_byteArray;
     };
 
+    class Class
+    {
+    public:
+        Class(const char* className);
+        Class(const jclass classObj);
+
+        operator jclass() const;
+
+        bool IsAssignableFrom(Class otherClass);
+
+    protected:
+        JNIEnv* m_env;
+        const jclass m_class;
+    };
+
     class Object
     {
     public:
         operator jobject() const;
+        Class GetClass();
 
     protected:
-        Object(const char* className, jobject object);
+        Object(const char* className);
+        Object(jobject object);
 
         JNIEnv* m_env;
-        const jclass m_class;
+        Class m_class;
         jobject m_object;
     };
 
@@ -103,6 +123,21 @@ namespace java::lang
         JNIEnv* m_env;
         jstring m_string;
     };
+
+    class Throwable : public Object, public std::exception
+    {
+    public:
+        Throwable(jthrowable throwable);
+        ~Throwable();
+
+        String GetMessage() const;
+
+        const char* what() const noexcept override;
+
+    private:
+        jobject m_throwableRef;
+        std::string m_message;
+    };
 }
 
 namespace java::io
@@ -111,6 +146,7 @@ namespace java::io
     {
     public:
         ByteArrayOutputStream();
+        ByteArrayOutputStream(int size);
         ByteArrayOutputStream(jobject object);
 
         void Write(lang::ByteArray b, int off, int len);
@@ -134,6 +170,8 @@ namespace java::net
     class HttpURLConnection : public lang::Object
     {
     public:
+        static lang::Class Class();
+
         HttpURLConnection(jobject object);
 
         int GetResponseCode() const;
@@ -158,6 +196,8 @@ namespace java::net
         void Connect();
 
         URL GetURL() const;
+
+        int GetContentLength() const;
 
         io::InputStream GetInputStream() const;
 
@@ -199,6 +239,8 @@ namespace android::content
 
         res::AssetManager getAssets() const;
 
+        res::Resources getResources();
+
         template<typename ServiceT>
         ServiceT getSystemService()
         {
@@ -220,6 +262,33 @@ namespace android::content::res
 
         operator AAssetManager*() const;
     };
+
+    class Resources : public java::lang::Object
+    {
+    public:
+        Resources(jobject object);
+
+        Configuration getConfiguration();
+    };
+
+    class Configuration : public java::lang::Object
+    {
+    public:
+        Configuration(jobject object);
+
+        int getDensityDpi();
+    };
+}
+
+namespace android::graphics
+{
+    class SurfaceTexture : public java::lang::Object
+    {
+    public:
+        SurfaceTexture();
+        void InitWithTexture(int texture);
+        void updateTexImage() const;
+    };
 }
 
 namespace android::view
@@ -239,6 +308,12 @@ namespace android::view
         WindowManager(jobject object);
 
         Display getDefaultDisplay();
+    };
+
+    class Surface : public java::lang::Object
+    {
+    public:
+        Surface(android::graphics::SurfaceTexture& surfaceTexture);
     };
 }
 

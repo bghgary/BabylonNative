@@ -1,8 +1,5 @@
-#if _MSC_VER 
-#pragma warning( disable : 4100 ) // unreferenced formal parameter in glslang header
-#endif
-
 #include "ShaderCompiler.h"
+#include "ShaderCompilerCommon.h"
 #include "ShaderCompilerTraversers.h"
 #include "ResourceLimits.h"
 #include <arcana/experimental/array.h>
@@ -25,7 +22,7 @@ namespace Babylon
 
             if (!shader.parse(&DefaultTBuiltInResource, 310, EProfile::EEsProfile, true, true, EShMsgDefault))
             {
-                throw std::runtime_error(shader.getInfoDebugLog());
+                throw std::runtime_error{shader.getInfoLog()};
             }
 
             program.addShader(&shader);
@@ -40,7 +37,8 @@ namespace Babylon
             parser->parse();
 
             auto compiler = std::make_unique<spirv_cross::CompilerHLSL>(parser->get_parsed_ir());
-            compiler->set_hlsl_options({40});
+
+            compiler->set_hlsl_options({40, true});
 
             for (const auto& attribute : attributes)
             {
@@ -60,7 +58,7 @@ namespace Babylon
 
             if (FAILED(D3DCompile(hlsl.data(), hlsl.size(), nullptr, nullptr, nullptr, "main", target, flags, 0, blob, &errorMsgs)))
             {
-                throw std::exception(static_cast<const char*>(errorMsgs->GetBufferPointer()));
+                throw std::runtime_error{static_cast<const char*>(errorMsgs->GetBufferPointer())};
             }
 
             return{std::move(parser), std::move(compiler)};
@@ -77,7 +75,7 @@ namespace Babylon
         glslang::FinalizeProcess();
     }
 
-    void ShaderCompiler::Compile(std::string_view vertexSource, std::string_view fragmentSource, std::function<void(ShaderInfo, ShaderInfo)> onCompiled)
+    ShaderCompiler::BgfxShaderInfo ShaderCompiler::Compile(std::string_view vertexSource, std::string_view fragmentSource)
     {
         glslang::TProgram program;
 
@@ -86,7 +84,6 @@ namespace Babylon
 
         glslang::TShader fragmentShader{EShLangFragment};
         AddShader(program, fragmentShader, fragmentSource);
-        InvertYDerivativeOperands(fragmentShader);
 
         glslang::SpvVersion spv{};
         spv.spv = 0x10000;
@@ -95,13 +92,15 @@ namespace Babylon
 
         if (!program.link(EShMsgDefault))
         {
-            throw std::exception(program.getInfoDebugLog());
+            throw std::runtime_error{program.getInfoLog()};
         }
 
         ShaderCompilerTraversers::IdGenerator ids{};
         auto utstScope = ShaderCompilerTraversers::MoveNonSamplerUniformsIntoStruct(program, ids);
-        ShaderCompilerTraversers::AssignLocationsAndNamesToVertexVaryings(program, ids);
+        std::unordered_map<std::string, std::string> vertexAttributeRenaming = {};
+        ShaderCompilerTraversers::AssignLocationsAndNamesToVertexVaryings(program, ids, vertexAttributeRenaming);
         ShaderCompilerTraversers::SplitSamplersIntoSamplersAndTextures(program, ids);
+        ShaderCompilerTraversers::InvertYDerivativeOperands(program);
 
         // clang-format off
         static const spirv_cross::HLSLVertexAttributeRemap attributes[] = {
@@ -124,18 +123,20 @@ namespace Babylon
 
         Microsoft::WRL::ComPtr<ID3DBlob> vertexBlob;
         auto [vertexParser, vertexCompiler] = CompileShader(program, EShLangVertex, attributes, &vertexBlob);
-        ShaderInfo vertexShaderInfo{
+        ShaderCompilerCommon::ShaderInfo vertexShaderInfo{
             std::move(vertexParser),
             std::move(vertexCompiler),
-            gsl::make_span(static_cast<uint8_t*>(vertexBlob->GetBufferPointer()), vertexBlob->GetBufferSize())};
+            gsl::make_span(static_cast<uint8_t*>(vertexBlob->GetBufferPointer()), vertexBlob->GetBufferSize()),
+            std::move(vertexAttributeRenaming)};
 
         Microsoft::WRL::ComPtr<ID3DBlob> fragmentBlob;
         auto [fragmentParser, fragmentCompiler] = CompileShader(program, EShLangFragment, {}, &fragmentBlob);
-        ShaderInfo fragmentShaderInfo{
+        ShaderCompilerCommon::ShaderInfo fragmentShaderInfo{
             std::move(fragmentParser),
             std::move(fragmentCompiler),
-            gsl::make_span(static_cast<uint8_t*>(fragmentBlob->GetBufferPointer()), fragmentBlob->GetBufferSize())};
+            gsl::make_span(static_cast<uint8_t*>(fragmentBlob->GetBufferPointer()), fragmentBlob->GetBufferSize()),
+            {}};
 
-        onCompiled(std::move(vertexShaderInfo), std::move(fragmentShaderInfo));
+        return ShaderCompilerCommon::CreateBgfxShader(std::move(vertexShaderInfo), std::move(fragmentShaderInfo));
     }
 }

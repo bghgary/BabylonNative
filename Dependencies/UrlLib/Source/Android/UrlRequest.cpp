@@ -62,61 +62,93 @@ namespace UrlLib
         {
             return arcana::make_task(arcana::threadpool_scheduler, m_cancellationSource, [this]()
             {
-                Uri uri{Uri::Parse(m_url.data())};
-                std::string scheme{uri.getScheme()};
-                if (scheme == "app") {
-                    std::string path{std::string{uri.getPath()}.substr(1)};
-                    AAssetManager* assetsManager{GetAppContext().getAssets()};
+                try
+                {
+                    Uri uri{Uri::Parse(m_url.data())};
+                    String scheme{uri.getScheme()};
+                    if (scheme != nullptr && (std::string)scheme == "app")
+                    {
+                        std::string path{std::string{uri.getPath()}.substr(1)};
+                        AAssetManager* assetsManager{GetAppContext().getAssets()};
 
-                    switch (m_responseType) {
-                        case UrlResponseType::String:
+                        switch (m_responseType)
                         {
-                            LoadAsset(assetsManager, path.data(), m_responseString);
-                            break;
+                            case UrlResponseType::String:
+                            {
+                                LoadAsset(assetsManager, path.data(), m_responseString);
+                                break;
+                            }
+                            case UrlResponseType::Buffer:
+                            {
+                                LoadAsset(assetsManager, path.data(), m_responseBuffer);
+                                break;
+                            }
+                            default:
+                            {
+                                throw std::runtime_error{"Invalid response type"};
+                            }
                         }
-                        case UrlResponseType::Buffer:
+
+                        m_statusCode = UrlStatusCode::Ok;
+                    }
+                    else
+                    {
+                        URL url{m_url.data()};
+
+                        URLConnection connection{url.OpenConnection()};
+                        connection.Connect();
+
+                        if (connection.GetClass().IsAssignableFrom(HttpURLConnection::Class()))
                         {
-                            LoadAsset(assetsManager, path.data(), m_responseBuffer);
-                            break;
+                            m_statusCode = static_cast<UrlStatusCode>(((HttpURLConnection)connection).GetResponseCode());
                         }
+                        else
+                        {
+                            m_statusCode = UrlStatusCode::Ok;
+                        }
+
+                        int contentLength = connection.GetContentLength();
+                        if (contentLength < 0)
+                        {
+                            contentLength = 0;
+                        }
+
+                        InputStream inputStream{connection.GetInputStream()};
+                        ByteArrayOutputStream byteArrayOutputStream{contentLength};
+
+                        ByteArray byteArray{4096};
+                        int bytesRead{};
+                        while ((bytesRead = inputStream.Read(byteArray)) != -1)
+                        {
+                            byteArrayOutputStream.Write(byteArray, 0, bytesRead);
+                        }
+
+                        switch (m_responseType)
+                        {
+                            case UrlResponseType::String:
+                            {
+                                // TODO: use the charset from the content type?
+                                m_responseString = byteArrayOutputStream.ToString("UTF-8");
+                                break;
+                            }
+                            case UrlResponseType::Buffer:
+                            {
+                                m_responseBuffer = byteArrayOutputStream.ToByteArray();
+                                break;
+                            }
+                            default:
+                            {
+                                throw std::runtime_error{"Invalid response type"};
+                            }
+                        }
+
+                        // Must happen after getting the content to get the redirected URL.
+                        m_responseUrl = connection.GetURL().ToString();
                     }
                 }
-                else
+                catch (const Throwable&)
                 {
-                    URL url{m_url.data()};
-
-                    URLConnection connection{url.OpenConnection()};
-                    connection.Connect();
-
-                    m_statusCode = static_cast<UrlStatusCode>(((HttpURLConnection)connection).GetResponseCode());
-
-                    InputStream inputStream{connection.GetInputStream()};
-                    ByteArrayOutputStream byteArrayOutputStream{};
-
-                    ByteArray byteArray{4096};
-                    int bytesRead{};
-                    while ((bytesRead = inputStream.Read(byteArray)) != -1)
-                    {
-                        byteArrayOutputStream.Write(byteArray, 0, bytesRead);
-                    }
-
-                    switch (m_responseType)
-                    {
-                        case UrlResponseType::String:
-                        {
-                            // TODO: use the charset from the content type?
-                            m_responseString = byteArrayOutputStream.ToString("UTF-8");
-                            break;
-                        }
-                        case UrlResponseType::Buffer:
-                        {
-                            m_responseBuffer = byteArrayOutputStream.ToByteArray();
-                            break;
-                        }
-                    }
-
-                    // Must happen after getting the content to get the redirected URL.
-                    m_responseUrl = connection.GetURL().ToString();
+                    // Catch Java exceptions, but retain the default status code of 0 to indicate a client side error.
                 }
             });
         }

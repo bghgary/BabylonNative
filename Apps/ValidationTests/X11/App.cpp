@@ -10,16 +10,18 @@
 #include <Shared/TestUtils.h>
 
 #include <Babylon/AppRuntime.h>
+#include <Babylon/Graphics.h>
 #include <Babylon/ScriptLoader.h>
 #include <Babylon/Plugins/NativeEngine.h>
-#include <Babylon/Plugins/NativeWindow.h>
 #include <Babylon/Polyfills/Console.h>
 #include <Babylon/Polyfills/Window.h>
 #include <Babylon/Polyfills/XMLHttpRequest.h>
+#include <Babylon/Polyfills/Canvas.h>
 
 static const char* s_applicationName  = "BabylonNative Validation Tests";
 static const char* s_applicationClass = "Validation Tests";
 
+std::unique_ptr<Babylon::Graphics> graphics{};
 std::unique_ptr<Babylon::AppRuntime> runtime{};
 
 static const int width = 600;
@@ -44,48 +46,67 @@ namespace
     {
         return std::string("file://") + path.generic_string();
     }
-    
-    void InitBabylon(int32_t window)
+
+    void Uninitialize()
+    {
+        if (graphics)
+        {
+            graphics->FinishRenderingCurrentFrame();
+        }
+        runtime.reset();
+        graphics.reset();
+    }
+
+    void InitBabylon(Window window)
     {
         std::string moduleRootUrl = GetUrlFromPath(GetModulePath().parent_path());
 
-        // Separately call reset and make_unique to ensure prior runtime is destroyed before new one is created.
-        runtime.reset();
+        Uninitialize();
+
+        Babylon::WindowConfiguration graphicsConfig{};
+        graphicsConfig.WindowPtr = (void*)(uintptr_t)window;
+        graphicsConfig.Width = static_cast<size_t>(width);
+        graphicsConfig.Height = static_cast<size_t>(height);
+
+        graphics = Babylon::Graphics::CreateGraphics(graphicsConfig);
+        graphics->SetDiagnosticOutput([](const char* outputString) { printf("%s", outputString); fflush(stdout); });
+        graphics->StartRenderingCurrentFrame();
+
         runtime = std::make_unique<Babylon::AppRuntime>();
 
         // Initialize console plugin.
         runtime->Dispatch([window](Napi::Env env) {
             Babylon::Polyfills::Console::Initialize(env, [](const char* message, auto) {
                 printf("%s", message);
+                fflush(stdout);
             });
 
             Babylon::TestUtils::CreateInstance(env, (void*)(uintptr_t)window);
 
             Babylon::Polyfills::Window::Initialize(env);
             Babylon::Polyfills::XMLHttpRequest::Initialize(env);
-
-            // Initialize NativeWindow plugin.
-            Babylon::Plugins::NativeWindow::Initialize(env, (void*)(uintptr_t)window, width, height);
+            Babylon::Polyfills::Canvas::Initialize(env);
 
             // Initialize NativeEngine plugin.
-            Babylon::Plugins::NativeEngine::InitializeGraphics((void*)(uintptr_t)window, width, height);
+            graphics->AddToJavaScript(env);
             Babylon::Plugins::NativeEngine::Initialize(env);
         });
-
 
         Babylon::ScriptLoader loader{*runtime};
         loader.Eval("document = {}", "");
         loader.LoadScript(moduleRootUrl + "/Scripts/babylon.max.js");
-        loader.LoadScript(moduleRootUrl + "/Scripts/babylon.glTF2FileLoader.js");
+        loader.LoadScript(moduleRootUrl + "/Scripts/babylonjs.loaders.js");
         loader.LoadScript(moduleRootUrl + "/Scripts/babylonjs.materials.js");
+        loader.LoadScript(moduleRootUrl + "/Scripts/babylon.gui.js");
         loader.LoadScript(moduleRootUrl + "/Scripts/validation_native.js");
     }
 
     void UpdateWindowSize(float width, float height)
     {
-        runtime->Dispatch([width, height](Napi::Env env) {
-            Babylon::Plugins::NativeWindow::UpdateSize(env, width, height);
-        });
+        if (graphics != nullptr)
+        {
+            graphics->UpdateSize(static_cast<size_t>(width), static_cast<size_t>(height));
+        }
     }
 }
 
@@ -158,29 +179,37 @@ int main(int /*_argc*/, const char* const* /*_argv*/)
     InitBabylon(window);
     UpdateWindowSize(width, height);
 
-    
     while (!doExit)
     {
-        XEvent event;
-        XNextEvent(display, &event);
-        switch (event.type)
+        if (!XPending(display) && graphics)
         {
-            case Expose:
-                break;
-            case ClientMessage:
-                if ( (Atom)event.xclient.data.l[0] == wmDeleteWindow)
-                {
-                    doExit = true;
-                }
-                break;
-            case ConfigureNotify:
-                {
-                    const XConfigureEvent& xev = event.xconfigure;
-                    UpdateWindowSize(xev.width, xev.height);
-                }
-                break;
+            graphics->FinishRenderingCurrentFrame();
+            graphics->StartRenderingCurrentFrame();
+        }
+        else
+        {
+            XEvent event;
+            XNextEvent(display, &event);
+            switch (event.type)
+            {
+                case Expose:
+                    break;
+                case ClientMessage:
+                    if ( (Atom)event.xclient.data.l[0] == wmDeleteWindow)
+                    {
+                        doExit = true;
+                    }
+                    break;
+                case ConfigureNotify:
+                    {
+                        const XConfigureEvent& xev = event.xconfigure;
+                        UpdateWindowSize(xev.width, xev.height);
+                    }
+                    break;
+            }
         }
     }
+    Uninitialize();
     XDestroyIC(ic);
     XCloseIM(im);
 

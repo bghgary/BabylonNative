@@ -1,4 +1,5 @@
 [![Build Status](https://dev.azure.com/babylonjs/ContinousIntegration/_apis/build/status/BabylonNative%20CI?branchName=master)](https://dev.azure.com/babylonjs/ContinousIntegration/_build/latest?definitionId=6&branchName=master)
+[![Nightly build](https://github.com/BabylonJS/BabylonNative/workflows/Nightly%20build/badge.svg)](https://github.com/BabylonJS/BabylonNative/actions?query=workflow%3A%22Nightly+build%22)
 
 # Babylon Native
 
@@ -31,26 +32,30 @@ UWP, macOS, iOS, Android.
 - Network requests (including accessing local files using the `file://` protocol) 
 made throught the Babylon.js APIs.
 - Extending JavaScript functionality using N-API and native plugins.
+- Debugging JavaScript with V8 on the following platforms: Win32.
 
 The following major features are partially implemented but not yet supported. Note 
 that this list is not exhaustive.
 
 - Developing Babylon Native on the following platforms: Linux.
-- Building and running the libraries and demo apps for the following platforms: 
-Android.
 - Mixed reality powered by OpenXR on the following platforms: Win32, UWP.
 
 The following major features are not yet supported or implemented, even as previews, 
 but are expected to be supported in the future. Note that this list is not exhaustive.
 
-- Debugging JavaScript with V8.
+- Debugging JavaScript with V8 on the following platforms: Android, Apple, UWP, iOS, Linux.
 - User input.
 - Font rendering.
 - Sub-window, multi-window, and out-of-process rendering.
-- React Native integration.
 
 This section will be updated frequently. If you have any questions, please reach out
 to us on [the Babylon forum](https://forum.babylonjs.com).
+
+## Documentation
+
+Babylon Native documentation is available in this repo. From extending Babylon Native using your very own features to debugging the rendering on iOS, [you'll find extensive documentation here.](Documentation/Readme.md)
+
+For Frequently Asked Questions (FAQ) regarding build and other issues, [You can check this page.](Documentation/faq.md)
 
 ## Build System and Extensions
 
@@ -70,21 +75,22 @@ principles.
 
 ### **All Development Platforms, Common First Steps**
 
-**Required Tools:** [git](https://git-scm.com/), [CMake](https://cmake.org/)
+**Required Tools:** [git](https://git-scm.com/), [CMake](https://cmake.org/), [node.js](https://nodejs.org/en/)
 
-Step 1 for all development environments and targets is to clone the repo. Use a 
-git-enabled terminal to follow the steps below.
-
-```
-git clone https://github.com/BabylonJS/BabylonNative.git
-```
-
-Babylon Native makes extensive use of submodules to supply its dependencies, so it's
-also necessary to set up the submodules.
+The first step for all development environments and targets is to clone the repo. Use a 
+git-enabled terminal to follow the steps below. The `--recursive` flag is necessary as
+Babylon Native makes extensive use of submodules to supply its dependencies.
 
 ```
-cd BabylonNative
-git submodule update --init --recursive
+git clone --recursive https://github.com/BabylonJS/BabylonNative.git
+```
+
+Babylon Native requires Babylon.js. You will need to install NPM packages to resolve these dependencies.
+
+```
+cd <repo root>
+cd Apps
+npm install
 ```
 
 Babylon Native's build system is based on CMake, which customarily uses a separate
@@ -93,6 +99,7 @@ a `Build` directory within your clone of the Babylon Native repository (Babylon
 Native's `.gitignore` file is already set up to ignore this `Build` directory).
 
 ```
+cd <repo root>
 mkdir Build
 cd Build
 ```
@@ -183,6 +190,24 @@ By default, the "Playground" demo app should be set as the Visual Studio start-u
 project. Build and run this app by pressing the green "Play" button or by pressing
 `F5` on your keyboard.
 
+### **Building on Windows 10, Targeting HoloLens 2**
+
+**Required Tools:** [Visual Studio 2019](https://visualstudio.microsoft.com/vs/) with 
+C++ and UWP development tools, [Python 3.0](https://www.python.org/) or newer (required 
+by dependencies)
+
+HoloLens 2 supports `arm64` UWP applications. To create a HoloLens 2 Visual Studio solution for a physical device, run the following command from the `BabylonNative/Build` directory:
+
+```
+cmake -D CMAKE_SYSTEM_NAME=WindowsStore -D CMAKE_SYSTEM_VERSION=10.0 -A arm64 ..
+```
+
+**Additional notes for HoloLens 2 development**:
+* At this time, running immersive applications on **HoloLens 2 emulators** is **NOT** supported. We are tracking support for **HoloLens 2 emulators** [here](https://github.com/BabylonJS/BabylonNative/issues/448).
+* For the Playground app, setting the `hololens` javascript variable to true in `experience.js` will configure the experience for **HoloLens 2**.
+* HoloLens 2 immersive experiences require the `Spatial Perception` UWP capability. This capability is enabled in the application's `Package.appxmanifest`. When creating a custom BabylonNative project, one will need to enable the `Spatial Perception` UWP cability in their app's `Package.appxmanifest`. For more information on UWP capabilities, see [here](https://docs.microsoft.com/en-us/windows/uwp/packaging/app-capability-declarations).
+* HoloLens 2 immersive experiences are built on top of `OpenXR`. Updates to the `OpenXR` runtime should automtically be installed on physical **HoloLens 2** devices through the Windows Store. If for some reason updates are not automatically installed (custom device configurations, lack of network connectivity, etc), developers may need to manually install updates for the `OpenXR` runtime through the Windows Store. For more information on installing newer versions of `OpenXR`, see [here](https://docs.microsoft.com/en-us/windows/mixed-reality/develop/native/openxr-getting-started).
+
 ### **Building on macOS, Targeting macOS**
 
 **Required Tools:** [Xcode 11](https://developer.apple.com/xcode/) or newer, 
@@ -197,6 +222,12 @@ correct build system generator for CMake to use, as follows:
 
 ```
 cmake -G Xcode ..
+```
+
+Starting with Xcode 12, it's mandatory to set the targeted CPU architectures (X86_64 and/or arm64).
+
+```
+cmake .. -GXcode "-DCMAKE_OSX_ARCHITECTURES=x86_64;arm64"
 ```
 
 CMake will generate a new `BabylonNative.xcodeproj` file in your working directory.
@@ -214,6 +245,15 @@ the top-left corner of the Xcode window. For example, to build and run the Playg
 demo app, click on the project selector and find "Playground" in the list of possible
 selections. The "Play" button will subsequently allow you to build, run, and debug
 the selected Babylon Native demo app.
+
+For macOS 11.0 Big Sur and ARM based CPU, you'll need to use XCode 12.
+Also, The CMake command line is different to indicate the use of other architecture:
+
+```
+cmake -G Xcode .. "-DCMAKE_OSX_ARCHITECTURES=x86_64;arm64"
+```
+
+If CMake is not available on your platform, you'll have to clone it and build it. [CMake repo](https://gitlab.kitware.com/cmake/cmake)
 
 ### **Building on macOS, Targeting iOS**
 
@@ -234,6 +274,12 @@ the following command:
 
 ```
 cmake -G Xcode -DCMAKE_TOOLCHAIN_FILE=../Dependencies/ios-cmake/ios.toolchain.cmake -DPLATFORM=OS64COMBINED -DENABLE_ARC=0 -DDEPLOYMENT_TARGET=12 -DENABLE_GLSLANG_BINARIES=OFF -DSPIRV_CROSS_CLI=OFF ..
+```
+
+To enable bitcode support, add this option to the cmake command line parameters:
+
+```
+-DENABLE_BITCODE=ON
 ```
 
 CMake will generate a new `BabylonNative.xcodeproj` file in your working directory.
@@ -268,7 +314,7 @@ First download the latest release of Ninja, extract the binary, and add it to yo
 Next install the Javascript engine dependencies. This is done by the Node.js npm package system.
 
 ```
-cd Apps\Playground\Android
+cd Apps
 npm install
 ```
 
@@ -291,31 +337,48 @@ be greyed and inaccessible. Instructions and tips on how to install the simulato
 **Required Tools:** 
 [Clang](https://clang.llvm.org/) or [GCC](https://gcc.gnu.org/)
 
-The minimal requirement target is an OpenGL 3.3 compatible GPU. Clang 8+ or GCC 9+ are required for building.
+The minimal requirement target is an OpenGL 3.3 compatible GPU. Clang 9+ or GCC 9+ are required for building.
 
-First step is to install packages mandatory for building. For example, with Clang-8 toolchain:
-
-```
-sudo apt-get install libjavascriptcoregtk-4.0-dev libgl1-mesa-dev libcurl4-openssl-dev clang-8 libc++-8-dev libc++abi-8-dev lld-8 ninja-build
-```
-
-Then targeting a Ninja make file:
+First step is to install packages mandatory for building. For example, with Clang-9 toolchain:
 
 ```
-cmake -GNinja -DJSCORE_LIBRARY=/usr/lib/x86_64-linux-gnu/libjavascriptcoregtk-4.0.so ..
+sudo apt-get install libgl1-mesa-dev libcurl4-openssl-dev clang-9 libc++-9-dev libc++abi-9-dev lld-9 ninja-build
 ```
 
-Ninja is not mandatory and make can be used instead.
-And finaly, run a build:
+Depending on the JavaScript engine you wan't to use, you will have to install the package accordingly:
+
+#### JavaScriptCore
+
+Install the following package:
+
+```
+sudo apt-get install libjavascriptcoregtk-4.0-dev 
+```
+
+Then, run cmake targetting a Ninja make file:
+
+```
+cmake -GNinja -DJSCORE_LIBRARY=/usr/lib/x86_64-linux-gnu/libjavascriptcoregtk-4.0.so  -DNAPI_JAVASCRIPT_ENGINE=JavaScriptCore ..
+```
+
+#### V8
+
+Install the following package:
+
+```
+sudo apt-get install libv8-dev 
+```
+
+Then, run cmake targetting a Ninja make file:
+
+```
+cmake -GNinja -DNAPI_JAVASCRIPT_ENGINE=V8 ..
+```
+
+And finally, for any JavaScript engine, run a build:
 
 ```
 ninja
-```
-
-or
-
-```
-make
 ```
 
 You can switch compiler between GCC and Clang by defining shell variables.
@@ -335,52 +398,13 @@ export CXX=/usr/bin/g++
 
 You will have to run CMake again to take changes into account.
 
-## Development Notes
+## Included Components
 
-### glslang and SPIRV-Cross
-
-In order to compile the WebGL GLSL shader to the required bits for the target platform, 
-this project utilizes [glslang](https://github.com/KhronosGroup/glslang) and 
-[SPIRV-Cross](https://github.com/KhronosGroup/SPIRV-Cross). See 
-[ShaderCompiler.h](./Plugins/NativeEngine/Source/ShaderCompiler.h) and its 
-corresponding implementation for details.
-
-### arcana.cpp
-
-This project makes substantial use of the utilities contained within the 
-[arcana.cpp](https://github.com/microsoft/arcana.cpp) project, especially the support 
-for asynchronous task execution and thread synchronization.
-
-### N-API
-
-This project uses a subset of [node-addon-api](https://github.com/nodejs/node-addon-api) 
-and the JavaScript part of 
-[N-API](https://github.com/nodejs/node/blob/master/src/js_native_api.h) to target either 
-V8 or Chakra. See [this thread](https://github.com/nodejs/abi-stable-node/issues/354) 
-for some context. There is also 
-[work](https://github.com/nodejs/node-addon-api/issues/399) needed to factor out the 
-JavaScript part of node-addon-api.
-
-The code is located [here](./Dependencies/napi). Some small modifications were made 
-to avoid node dependencies and improve performance. The Chakra version 
-[js_native_api_chakra.cc](./Dependencies/napi/source/js_native_api_chakra.cc) came from 
-[node_api_jsrt.cc](https://github.com/nodejs/node-chakracore/blob/master/src/node_api_jsrt.cc) 
-and was modified to target Chakra directly. We will work on submitting these changes 
-to the public version.
-
-### bgfx
-
-This project uses [bgfx](https://github.com/bkaradzic/bgfx) for the cross-platform 
-rendering abstraction. It does not use the shader abstraction of bgfx, but instead 
-[compiles the WebGL GLSL shader at runtime](#glslang-and-SPIRV-Cross) and generates 
-the shader header that bgfx expects. See 
-[NativeEngine.cpp](./Plugins/NativeEngine/Source/NativeEngine.cpp) for implementation 
-details.
-
-### base-n
-
-This project uses [base-n](https://github.com/azawadzki/base-n) to implement base64 
-decoding for parsing data URLs.
+For an overview of the major components included with the Babylon Native repository, 
+please read the dedicated [Components](./Documentation/Components.md) documentation
+page. Particularly important components are discussed in dedicated pages for 
+[JsRuntime](./Documentation/JsRuntime.md), [AppRuntime](./Documentation/AppRuntime.md),
+and [NativeEngine](./Documentation/NativeEngine.md).
 
 ## Contributing
 
@@ -395,3 +419,4 @@ You should receive a response within 24 hours. If for some reason you do not, pl
 follow up via email to ensure we received your original message. Further information, 
 including the [MSRC PGP](https://technet.microsoft.com/en-us/security/dn606155) key, can 
 be found in the [Security TechCenter](https://technet.microsoft.com/en-us/security/default).
+ 

@@ -10,18 +10,20 @@
 #include <Shared/InputManager.h>
 
 #include <Babylon/AppRuntime.h>
+#include <Babylon/Graphics.h>
 #include <Babylon/ScriptLoader.h>
 #include <Babylon/Plugins/NativeEngine.h>
-#include <Babylon/Plugins/NativeWindow.h>
 #include <Babylon/Polyfills/Console.h>
 #include <Babylon/Polyfills/Window.h>
 #include <Babylon/Polyfills/XMLHttpRequest.h>
+#include <Babylon/Polyfills/Canvas.h>
 
 static const char* s_applicationName  = "BabylonNative Playground";
 static const char* s_applicationClass = "Playground";
 
+std::unique_ptr<Babylon::Graphics> graphics{};
 std::unique_ptr<Babylon::AppRuntime> runtime{};
-std::unique_ptr<InputManager::InputBuffer> inputBuffer{};
+std::unique_ptr<InputManager<Babylon::AppRuntime>::InputBuffer> inputBuffer{};
 
 namespace
 {
@@ -42,38 +44,53 @@ namespace
     {
         return std::string("file://") + path.generic_string();
     }
-    
-    void InitBabylon(int32_t window, int width, int height, int argc, const char* const* argv)
+
+    void Uninitialize()
+    {
+        if (graphics)
+        {
+            graphics->FinishRenderingCurrentFrame();
+        }
+        runtime.reset();
+        inputBuffer.reset();
+        graphics.reset();
+    }
+
+    void InitBabylon(Window window, int width, int height, int argc, const char* const* argv)
     {
         std::vector<std::string> scripts(argv + 1, argv + argc);
         std::string moduleRootUrl = GetUrlFromPath(GetModulePath().parent_path());
 
-        // Ensure this is properly disposed.
-        inputBuffer.reset();
+        Uninitialize();
 
-        // Separately call reset and make_unique to ensure prior runtime is destroyed before new one is created.
-        runtime.reset();
+        // Separately call reset and make_unique to ensure prior state is destroyed before new one is created.
+        Babylon::WindowConfiguration graphicsConfig{};
+        graphicsConfig.WindowPtr = (void*)(uintptr_t)window;
+        graphicsConfig.Width = static_cast<size_t>(width);
+        graphicsConfig.Height = static_cast<size_t>(height);
+
+        graphics = Babylon::Graphics::CreateGraphics(graphicsConfig);
+        graphics->StartRenderingCurrentFrame();
+
         runtime = std::make_unique<Babylon::AppRuntime>();
+        inputBuffer = std::make_unique<InputManager<Babylon::AppRuntime>::InputBuffer>(*runtime);
 
         // Initialize console plugin.
-        runtime->Dispatch([width, height, window](Napi::Env env) {
+        runtime->Dispatch([](Napi::Env env) {
             Babylon::Polyfills::Console::Initialize(env, [](const char* message, auto) {
                 printf("%s", message);
+                fflush(stdout);
             });
 
             Babylon::Polyfills::Window::Initialize(env);
             Babylon::Polyfills::XMLHttpRequest::Initialize(env);
-
-            // Initialize NativeWindow plugin.
-            Babylon::Plugins::NativeWindow::Initialize(env, (void*)(uintptr_t)window, width, height);
+            Babylon::Polyfills::Canvas::Initialize(env);
 
             // Initialize NativeEngine plugin.
-            Babylon::Plugins::NativeEngine::InitializeGraphics((void*)(uintptr_t)window, width, height);
+            graphics->AddToJavaScript(env);
             Babylon::Plugins::NativeEngine::Initialize(env);
 
-            auto& jsRuntime = Babylon::JsRuntime::GetFromJavaScript(env);
-            inputBuffer = std::make_unique<InputManager::InputBuffer>(jsRuntime);
-            InputManager::Initialize(jsRuntime, *inputBuffer);
+            InputManager<Babylon::AppRuntime>::Initialize(env, *inputBuffer);
         });
 
 
@@ -82,8 +99,9 @@ namespace
         loader.LoadScript(moduleRootUrl + "/Scripts/ammo.js");
         loader.LoadScript(moduleRootUrl + "/Scripts/recast.js");
         loader.LoadScript(moduleRootUrl + "/Scripts/babylon.max.js");
-        loader.LoadScript(moduleRootUrl + "/Scripts/babylon.glTF2FileLoader.js");
+        loader.LoadScript(moduleRootUrl + "/Scripts/babylonjs.loaders.js");
         loader.LoadScript(moduleRootUrl + "/Scripts/babylonjs.materials.js");
+        loader.LoadScript(moduleRootUrl + "/Scripts/babylon.gui.js");
 
         if (scripts.empty())
         {
@@ -102,9 +120,10 @@ namespace
 
     void UpdateWindowSize(float width, float height)
     {
-        runtime->Dispatch([width, height](Napi::Env env) {
-            Babylon::Plugins::NativeWindow::UpdateSize(env, width, height);
-        });
+        if (graphics != nullptr)
+        {
+            graphics->UpdateSize(width, height);
+        }
     }
 }
 
@@ -182,36 +201,45 @@ int main(int _argc, const char* const* _argv)
     bool exit{};
     while (!exit)
     {
-        XEvent event;
-        XNextEvent(display, &event);
-        switch (event.type)
+        if (!XPending(display) && graphics)
         {
-            case Expose:
-                break;
-            case ClientMessage:
-                if ( (Atom)event.xclient.data.l[0] == wmDeleteWindow)
-                {
-                    exit = true;
-                }
-                break;
-            case ConfigureNotify:
-                {
-                    const XConfigureEvent& xev = event.xconfigure;
-                    UpdateWindowSize(xev.width, xev.height);
-                }
-                break;
-            case ButtonPress:
-                inputBuffer->SetPointerDown(true);
-                break;
-            case ButtonRelease:
-                inputBuffer->SetPointerDown(false);
-                break;
-            case MotionNotify:
-                {
-                    const XMotionEvent& xmotion = event.xmotion;
-                    inputBuffer->SetPointerPosition(xmotion.x, xmotion.y);
-                }
-                break;
+            graphics->FinishRenderingCurrentFrame();
+            graphics->StartRenderingCurrentFrame();
+        }
+        else
+        {
+            XEvent event;
+            XNextEvent(display, &event);
+            switch (event.type)
+            {
+                case Expose:
+                    break;
+                case ClientMessage:
+                    if ( (Atom)event.xclient.data.l[0] == wmDeleteWindow)
+                    {
+                        Uninitialize();
+                        exit = true;
+                    }
+                    break;
+                case ConfigureNotify:
+                    {
+                        const XConfigureEvent& xev = event.xconfigure;
+                        UpdateWindowSize(xev.width, xev.height);
+                    }
+                    break;
+                case ButtonPress:
+                    inputBuffer->SetPointerDown(true);
+                    break;
+                case ButtonRelease:
+                    inputBuffer->SetPointerDown(false);
+                    break;
+                case MotionNotify:
+                    {
+                        const XMotionEvent& xmotion = event.xmotion;
+                        inputBuffer->SetPointerPosition(xmotion.x, xmotion.y);
+                    }
+                    break;
+            }
         }
     }
     XDestroyIC(ic);

@@ -14,12 +14,14 @@
 #include <Shared/TestUtils.h>
 
 #include <Babylon/AppRuntime.h>
+#include <Babylon/Graphics.h>
 #include <Babylon/ScriptLoader.h>
 #include <Babylon/Plugins/NativeEngine.h>
-#include <Babylon/Plugins/NativeWindow.h>
+#include <Babylon/Plugins/NativeXr.h>
 #include <Babylon/Polyfills/Console.h>
 #include <Babylon/Polyfills/Window.h>
 #include <Babylon/Polyfills/XMLHttpRequest.h>
+#include <Babylon/Polyfills/Canvas.h>
 #include <iostream>
 
 #define MAX_LOADSTRING 100
@@ -28,6 +30,7 @@
 HINSTANCE hInst;                                // current instance
 WCHAR szTitle[MAX_LOADSTRING];                  // The title bar text
 WCHAR szWindowClass[MAX_LOADSTRING];            // the main window class name
+std::unique_ptr<Babylon::Graphics> graphics{};
 std::unique_ptr<Babylon::AppRuntime> runtime{};
 
 // 600, 400 mandatory size for CI tests
@@ -41,96 +44,58 @@ LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 
 namespace
 {
-    std::filesystem::path GetModulePath()
-    {
-        char buffer[1024];
-        ::GetModuleFileNameA(nullptr, buffer, ARRAYSIZE(buffer));
-        return std::filesystem::path{ buffer };
-    }
-
-    std::string GetUrlFromPath(const std::filesystem::path& path)
-    {
-        char url[1024];
-        DWORD length = ARRAYSIZE(url);
-        HRESULT hr = UrlCreateFromPathA(path.u8string().data(), url, &length, 0);
-        if (FAILED(hr))
-        {
-            throw std::exception("Failed to create url from path", hr);
-        }
-
-        return { url };
-    }
-
-    std::vector<std::string> GetCommandLineArguments()
-    {
-        int argc;
-        auto argv = CommandLineToArgvW(GetCommandLineW(), &argc);
-
-        std::vector<std::string> arguments{};
-        arguments.reserve(argc);
-
-        for (int idx = 1; idx < argc; idx++)
-        {
-            std::wstring hstr{ argv[idx] };
-            int bytesRequired = ::WideCharToMultiByte(CP_UTF8, 0, &hstr[0], static_cast<int>(hstr.size()), nullptr, 0, nullptr, nullptr);
-            arguments.push_back(std::string(bytesRequired, 0));
-            ::WideCharToMultiByte(CP_UTF8, 0, hstr.data(), static_cast<int>(hstr.size()), arguments.back().data(), bytesRequired, nullptr, nullptr);
-        }
-
-        LocalFree(argv);
-
-        return arguments;
-    }
-
     void Uninitialize()
     {
-        if (runtime)
+        if (graphics)
         {
-            runtime.reset();
-            Babylon::Plugins::NativeEngine::DeinitializeGraphics();
+            graphics->FinishRenderingCurrentFrame();
         }
+
+        runtime.reset();
+        graphics.reset();
     }
 
     void Initialize(HWND hWnd)
     {
+        Babylon::WindowConfiguration graphicsConfig{};
+        graphicsConfig.WindowPtr = hWnd;
+        graphicsConfig.Width = static_cast<size_t>(TEST_WIDTH);
+        graphicsConfig.Height = static_cast<size_t>(TEST_HEIGHT);
+
+        graphics = Babylon::Graphics::CreateGraphics(graphicsConfig);
+        graphics->SetDiagnosticOutput([](const char* outputString) { printf("%s", outputString); fflush(stdout); });
+        graphics->StartRenderingCurrentFrame();
+
         runtime = std::make_unique<Babylon::AppRuntime>();
+
         // Initialize console plugin.
-        runtime->Dispatch([hWnd](Napi::Env env)
-            {
-                const int width = TEST_WIDTH;
-                const int height = TEST_HEIGHT;
+        runtime->Dispatch([hWnd](Napi::Env env) {
+            graphics->AddToJavaScript(env);
 
-                Babylon::Polyfills::Console::Initialize(env, [](const char* message, auto) {
-                    OutputDebugStringA(message);
-                    printf("%s", message);
-                });
+            Babylon::Polyfills::Console::Initialize(env, [](const char* message, auto) {
+                OutputDebugStringA(message);
 
-                Babylon::Polyfills::Window::Initialize(env);
-                Babylon::Polyfills::XMLHttpRequest::Initialize(env);
-
-                Babylon::Polyfills::Window::Initialize(env);
-                // Initialize NativeWindow plugin to the test size.
-                // TODO: TestUtils::UpdateSize should do it properly but the client size
-                // is not forwarded correctly to the rendering. Find why.
-                Babylon::Plugins::NativeWindow::Initialize(env, hWnd, width, height);
-
-                // Initialize NativeEngine plugin.
-                Babylon::Plugins::NativeEngine::InitializeGraphics(hWnd, width, height);
-                Babylon::Plugins::NativeEngine::Initialize(env);
-
-                Babylon::TestUtils::CreateInstance(env, hWnd);
-                Babylon::Plugins::NativeWindow::UpdateSize(env, width, height);
+                printf("%s", message);
+                fflush(stdout);
             });
 
-        // Scripts are copied to the parent of the executable due to CMake issues.
-        // See the CMakeLists.txt comments for more details.
-        std::string scriptsRootUrl = GetUrlFromPath(GetModulePath().parent_path().parent_path() / "Scripts");
+            Babylon::Polyfills::Window::Initialize(env);
+            Babylon::Polyfills::XMLHttpRequest::Initialize(env);
+            Babylon::Polyfills::Canvas::Initialize(env);
+
+            Babylon::Plugins::NativeEngine::Initialize(env);
+
+            Babylon::Plugins::NativeXr::Initialize(env);
+
+            Babylon::TestUtils::CreateInstance(env, hWnd);
+        });
 
         Babylon::ScriptLoader loader{ *runtime };
-        loader.LoadScript(scriptsRootUrl + "/babylon.max.js");
-        loader.LoadScript(scriptsRootUrl + "/babylon.glTF2FileLoader.js");
-        loader.LoadScript(scriptsRootUrl + "/babylonjs.materials.js");
-        loader.LoadScript(scriptsRootUrl + "/validation_native.js");
+        loader.LoadScript("app:///Scripts/babylon.max.js");
+        loader.LoadScript("app:///Scripts/babylonjs.loaders.js");
+        loader.LoadScript("app:///Scripts/babylonjs.materials.js");
+        loader.LoadScript("app:///Scripts/babylon.gui.js");
+        loader.LoadScript("app:///Scripts/validation_native.js");
     }
 }
 
@@ -155,15 +120,24 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
 
     HACCEL hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_VALIDATIONTESTSWIN32));
 
-    MSG msg;
+    MSG msg{};
 
     // Main message loop:
-    while (GetMessage(&msg, nullptr, 0, 0))
+    while (msg.message != WM_QUIT)
     {
-        if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg))
+        if (graphics)
         {
-            TranslateMessage(&msg);
-            DispatchMessage(&msg);
+            graphics->FinishRenderingCurrentFrame();
+            graphics->StartRenderingCurrentFrame();
+        }
+
+        if (PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE) && msg.message != WM_QUIT)
+        {
+            if (!TranslateAccelerator(msg.hwnd, hAccelTable, &msg))
+            {
+                TranslateMessage(&msg);
+                DispatchMessage(&msg);
+            }
         }
     }
 
@@ -209,7 +183,7 @@ ATOM MyRegisterClass(HINSTANCE hInstance)
 BOOL InitInstance(HINSTANCE hInstance, int nCmdShow)
 {
     hInst = hInstance; // Store instance handle in our global variable
-    HWND hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPEDWINDOW,
+    HWND hWnd = CreateWindowW(szWindowClass, szTitle, WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU,
         CW_USEDEFAULT, CW_USEDEFAULT, TEST_WIDTH, TEST_HEIGHT, nullptr, nullptr, hInstance, nullptr);
 
     if (!hWnd)
@@ -238,42 +212,20 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 {
     switch (message)
     {
-        case WM_SYSCOMMAND:
-        {
-            if ((wParam & 0xFFF0) == SC_MINIMIZE)
-            {
-                runtime->Suspend();
-            }
-            else if ((wParam & 0xFFF0) == SC_RESTORE)
-            {
-                runtime->Resume();
-            }
-            DefWindowProc(hWnd, message, wParam, lParam);
-            break;
-        }
-        case WM_PAINT:
-        {
-            PAINTSTRUCT ps;
-            BeginPaint(hWnd, &ps);
-            EndPaint(hWnd, &ps);
-            break;
-        }
         case WM_SIZE:
         {
-            if (runtime != nullptr) {
+            if (graphics)
+            {
                 size_t width = static_cast<size_t>(LOWORD(lParam));
                 size_t height = static_cast<size_t>(HIWORD(lParam));
-                runtime->Dispatch([width, height](Napi::Env env) {
-                    Babylon::Plugins::NativeWindow::UpdateSize(env, width, height);
-                });
+                graphics->UpdateSize(width, height);
             }
             break;
         }
         case WM_DESTROY:
         {
-            short exitCode = LOWORD(wParam);
             Uninitialize();
-            PostQuitMessage(exitCode);
+            PostQuitMessage(errorCode);
             break;
         }
         default:

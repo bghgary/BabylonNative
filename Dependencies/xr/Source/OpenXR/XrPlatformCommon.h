@@ -2,8 +2,16 @@
 
 #include <XR.h>
 
+// Note: these headers are from OpenXR-MixedReality not OpenXR-SDK
 #include <openxr/openxr.h>
 #include <openxr/openxr_platform.h>
+
+#include <XrUtility/XrEnumerate.h>
+#include <XrUtility/XrExtensions.h>
+#include <XrUtility/XrStruct.h>
+#include <XrUtility/XrViewConfiguration.h>
+#include <XrUtility/XrHandle.h>
+#include <XrUtility/XrMath.h>
 
 #include <assert.h>
 #include <stdexcept>

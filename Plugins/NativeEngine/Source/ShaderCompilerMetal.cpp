@@ -1,4 +1,5 @@
 #include "ShaderCompiler.h"
+#include "ShaderCompilerCommon.h"
 #include "ShaderCompilerTraversers.h"
 #include "ResourceLimits.h"
 #include <arcana/experimental/array.h>
@@ -19,7 +20,7 @@ namespace Babylon
 
             if (!shader.parse(&DefaultTBuiltInResource, 310, EProfile::EEsProfile, true, true, EShMsgDefault))
             {
-                throw std::runtime_error(shader.getInfoDebugLog());
+                throw std::runtime_error(shader.getInfoLog());
             }
 
             program.addShader(&shader);
@@ -35,28 +36,17 @@ namespace Babylon
 
             auto compiler = std::make_unique<spirv_cross::CompilerMSL>(parser->get_parsed_ir());
 
+            // Enable decoration for texture binding
+            spirv_cross::CompilerMSL::Options opts{};
+            opts.enable_decoration_binding = true;
+            compiler->set_msl_options(opts);
+
             auto resources = compiler->get_shader_resources();
             for (auto& resource : resources.uniform_buffers)
             {
                 compiler->set_name(resource.id, "_mtl_u");
             }
 
-            // Disable location for varying stage to force compiler to do it with variable names
-            if (stage == EShLangVertex)
-            {
-                for (auto& output : resources.stage_outputs)
-                {
-                    compiler->set_decoration(output.id, spv::DecorationLocation, -1);
-                }
-            }
-            else
-            {
-              for (auto& input : resources.stage_inputs)
-                {
-                    compiler->set_decoration(input.id, spv::DecorationLocation, -1);
-                }
-            }
-            
             // rename textures without the 'texture' suffix so it's bindable from .js
             for (auto& resource : resources.separate_images)
             {
@@ -67,7 +57,7 @@ namespace Babylon
                     compiler->set_name(resource.id, imageName);
                 }
             }
-            
+
             compiler->rename_entry_point("main", "xlatMtlMain", (stage == EShLangVertex) ? spv::ExecutionModelVertex : spv::ExecutionModelFragment);
 
             shaderResult = compiler->compile();
@@ -88,7 +78,7 @@ namespace Babylon
         glslang::FinalizeProcess();
     }
 
-    void ShaderCompiler::Compile(std::string_view vertexSource, std::string_view fragmentSource, std::function<void(ShaderInfo, ShaderInfo)> onCompiled)
+    ShaderCompiler::BgfxShaderInfo ShaderCompiler::Compile(std::string_view vertexSource, std::string_view fragmentSource)
     {
         glslang::TProgram program;
 
@@ -97,7 +87,6 @@ namespace Babylon
 
         glslang::TShader fragmentShader{EShLangFragment};
         AddShader(program, fragmentShader, fragmentSource);
-        InvertYDerivativeOperands(fragmentShader);
 
         glslang::SpvVersion spv{};
         spv.spv = 0x10000;
@@ -112,8 +101,10 @@ namespace Babylon
         ShaderCompilerTraversers::IdGenerator ids{};
         auto cutScope = ShaderCompilerTraversers::ChangeUniformTypes(program, ids);
         auto utstScope = ShaderCompilerTraversers::MoveNonSamplerUniformsIntoStruct(program, ids);
-        ShaderCompilerTraversers::AssignLocationsAndNamesToVertexVaryings(program, ids);
+        std::unordered_map<std::string, std::string> vertexAttributeRenaming = {};
+        ShaderCompilerTraversers::AssignLocationsAndNamesToVertexVaryings(program, ids, vertexAttributeRenaming);
         ShaderCompilerTraversers::SplitSamplersIntoSamplersAndTextures(program, ids);
+        ShaderCompilerTraversers::InvertYDerivativeOperands(program);
 
         std::string vertexGLSL(vertexSource.data(), vertexSource.size());
         auto [vertexParser, vertexCompiler] = CompileShader(program, EShLangVertex, vertexGLSL);
@@ -121,11 +112,8 @@ namespace Babylon
         std::string fragmentGLSL(fragmentSource.data(), fragmentSource.size());
         auto [fragmentParser, fragmentCompiler] = CompileShader(program, EShLangFragment, fragmentGLSL);
 
-        uint8_t* strVertex = (uint8_t*)vertexGLSL.data();
-        uint8_t* strFragment = (uint8_t*)fragmentGLSL.data();
-        onCompiled(
-            {std::move(vertexParser), std::move(vertexCompiler), gsl::make_span(strVertex, vertexGLSL.size())},
-            {std::move(fragmentParser), std::move(fragmentCompiler), gsl::make_span(strFragment, fragmentGLSL.size())});
-        
+        return ShaderCompilerCommon::CreateBgfxShader(
+            {std::move(vertexParser), std::move(vertexCompiler), gsl::make_span(reinterpret_cast<uint8_t*>(vertexGLSL.data()), vertexGLSL.size()), std::move(vertexAttributeRenaming)},
+            {std::move(fragmentParser), std::move(fragmentCompiler), gsl::make_span(reinterpret_cast<uint8_t*>(fragmentGLSL.data()), fragmentGLSL.size()), {}});
     }
 }

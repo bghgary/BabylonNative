@@ -3,7 +3,8 @@
 #include <Babylon/JsRuntime.h>
 
 #include <memory>
-#include <string>
+#include <functional>
+#include <exception>
 
 namespace Babylon
 {
@@ -13,6 +14,7 @@ namespace Babylon
     {
     public:
         AppRuntime();
+        AppRuntime(std::function<void(std::exception_ptr)> unhandledExceptionHandler);
         ~AppRuntime();
 
         void Suspend();
@@ -34,6 +36,12 @@ namespace Babylon
         void RunPlatformTier();
         void RunEnvironmentTier(const char* executablePath = ".");
         void Run(Napi::Env);
+
+        // This method is called from Dispatch to allow platform-specific code to add
+        // extra logic around the invocation of a dispatched callback.
+        void Execute(std::function<void()> callback);
+
+        static void DefaultUnhandledExceptionHandler(std::exception_ptr ptr);
 
         std::unique_ptr<WorkQueue> m_workQueue;
     };
