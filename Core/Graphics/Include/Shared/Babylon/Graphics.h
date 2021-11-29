@@ -82,6 +82,8 @@ namespace Babylon
 
         float GetDevicePixelRatio() const;
 
+        uint16_t CreateNativeTexture(uintptr_t texturePtr);
+
     private:
         Graphics();
 

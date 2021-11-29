@@ -102,4 +102,9 @@ namespace Babylon
     {
         return m_impl->GetDevicePixelRatio();
     }
+
+    uint16_t Graphics::CreateNativeTexture(uintptr_t texturePtr)
+    {
+        return m_impl->CreateNativeTexture(texturePtr);
+    }
 }

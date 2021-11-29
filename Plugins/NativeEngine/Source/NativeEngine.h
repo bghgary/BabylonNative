@@ -94,6 +94,8 @@ namespace Babylon
 
         static void Initialize(Napi::Env env);
 
+        static Napi::Value WrapNativeTexture(Napi::Env env, uint16_t textureHandle, uint32_t width, uint32_t height);
+
     private:
         void Dispose();
 
