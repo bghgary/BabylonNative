@@ -436,14 +436,10 @@ namespace Babylon
 
         if (m_rendering)
         {
-            FinishRenderingCurrentFrame();
-            StartRenderingCurrentFrame();
+            throw std::runtime_error{"Cannot create native texture while rendering"};
         }
-        else
-        {
-            StartRenderingCurrentFrame();
-            FinishRenderingCurrentFrame();
-        }
+
+        bgfx::frame();
 
         if (bgfx::overrideInternal(textureHandle, texturePtr) == 0)
         {
