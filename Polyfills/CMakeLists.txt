@@ -1,5 +1,13 @@
+if(BABYLON_NATIVE_POLYFILL_CANVAS)
+    add_subdirectory(Canvas)
+endif()
+
 if(BABYLON_NATIVE_POLYFILL_CONSOLE)
     add_subdirectory(Console)
+endif()
+
+if(BABYLON_NATIVE_POLYFILL_REQUIRE)
+    add_subdirectory(Require)
 endif()
 
 if(BABYLON_NATIVE_POLYFILL_WINDOW)
@@ -8,8 +16,4 @@ endif()
 
 if(BABYLON_NATIVE_POLYFILL_XMLHTTPREQUEST)
     add_subdirectory(XMLHttpRequest)
-endif()
-
-if(BABYLON_NATIVE_POLYFILL_CANVAS)
-    add_subdirectory(Canvas)
 endif()

@@ -3,6 +3,7 @@
 #include <future>
 #include <Babylon/AppRuntime.h>
 #include <Babylon/Graphics/Device.h>
+#include <Babylon/Polyfills/Require.h>
 #include <Babylon/Polyfills/XMLHttpRequest.h>
 #include <Babylon/Polyfills/Console.h>
 #include <Babylon/Polyfills/Window.h>
@@ -34,6 +35,9 @@ int Run(std::unique_ptr<Babylon::Graphics::Device> device)
     {
         device->AddToJavaScript(env);
 
+
+        Babylon::Polyfills::Require::Initialize(env, "D:\\GitHub\\BabylonJS\\BabylonNative\\Apps\\node_modules");
+
         Babylon::Polyfills::XMLHttpRequest::Initialize(env);
         Babylon::Polyfills::Console::Initialize(env, [](const char* message, auto)
         {
@@ -47,13 +51,13 @@ int Run(std::unique_ptr<Babylon::Graphics::Device> device)
         env.Global().Set(JS_FUNCTION_NAME, Napi::Function::New(env, SetExitCode, JS_FUNCTION_NAME));
     });
     Babylon::ScriptLoader loader{*runtime};
-    loader.Eval("global = {};", ""); // Required for Chai.js as we do not have global in Babylon Native
-    loader.Eval("window.clearTimeout = () => {};", ""); // TODO: implement clear timeout, required for Mocha timeouts to work correctly
-    loader.Eval("location = {href: ''};", "");          // Required for Mocha.js as we do not have a location in Babylon Native
-    loader.LoadScript("app:///Scripts/babylon.max.js");
-    loader.LoadScript("app:///Scripts/babylonjs.materials.js");
-    loader.LoadScript("app:///Scripts/chai.js");
-    loader.LoadScript("app:///Scripts/mocha.js");
+    //loader.Eval("global = {};", ""); // Required for Chai.js as we do not have global in Babylon Native
+    //loader.Eval("window.clearTimeout = () => {};", ""); // TODO: implement clear timeout, required for Mocha timeouts to work correctly
+    //loader.Eval("location = {href: ''};", "");          // Required for Mocha.js as we do not have a location in Babylon Native
+    //loader.LoadScript("app:///Scripts/babylon.max.js");
+    //loader.LoadScript("app:///Scripts/babylonjs.materials.js");
+    //loader.LoadScript("app:///Scripts/chai.js");
+    //loader.LoadScript("app:///Scripts/mocha.js");
     loader.LoadScript("app:///Scripts/tests.js");
     device->StartRenderingCurrentFrame();
     device->FinishRenderingCurrentFrame();

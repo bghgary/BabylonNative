@@ -29,14 +29,15 @@ endif()
 add_executable(UnitTests ${LOCAL_SCRIPTS} ${NPM_SCRIPTS} ${TEST_APP})
 
 target_link_to_dependencies(UnitTests
-    UrlLib
-    AppRuntime
-    XMLHttpRequest
-    NativeEngine
-    ScriptLoader
-    Console
-    Window
-    Canvas
+    PRIVATE UrlLib
+    PRIVATE AppRuntime
+    PRIVATE XMLHttpRequest
+    PRIVATE NativeEngine
+    PRIVATE ScriptLoader
+    PRIVATE Console
+    PRIVATE Window
+    PRIVATE Canvas
+    PRIVATE Require
     ${ADDITIONAL_LIBRARIES})
 
 add_test(NAME UnitTests COMMAND UnitTests)
