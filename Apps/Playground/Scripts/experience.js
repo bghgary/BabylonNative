@@ -4,9 +4,9 @@
 /// <reference path="../../node_modules/babylonjs-gui/babylon.gui.module.d.ts" />
 
 var wireframe = false;
-var turntable = false;
-var logfps = true;
-var ibl = false;
+var turntable = true;
+var logfps = false;
+var ibl = true;
 var rtt = false;
 var vr = false;
 var ar = false;
@@ -43,7 +43,7 @@ function CreateSpheresAsync(scene) {
 var engine = new BABYLON.NativeEngine();
 var scene = new BABYLON.Scene(engine);
 
-CreateBoxAsync(scene).then(function () {
+//CreateBoxAsync(scene).then(function () {
 //CreateSpheresAsync(scene).then(function () {
 //BABYLON.SceneLoader.AppendAsync("https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/Box/glTF/Box.gltf").then(function () {
 //BABYLON.SceneLoader.AppendAsync("https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/BoxTextured/glTF/BoxTextured.gltf").then(function () {
@@ -61,14 +61,33 @@ CreateBoxAsync(scene).then(function () {
 //BABYLON.SceneLoader.AppendAsync("https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/RiggedFigure/glTF/RiggedFigure.gltf").then(function () {
 //BABYLON.SceneLoader.AppendAsync("https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/CesiumMan/glTF/CesiumMan.gltf").then(function () {
 //BABYLON.SceneLoader.AppendAsync("https://raw.githubusercontent.com/KhronosGroup/glTF-Sample-Models/master/2.0/ClearCoatTest/glTF/ClearCoatTest.gltf").then(function () {
+BABYLON.SceneLoader.ImportMeshAsync("", "https://raw.githubusercontent.com/BabylonJS/Assets/master/meshes/vintageDeskFan/vintageFan_animated.gltf").then(function (model) {
     BABYLON.Tools.Log("Loaded");
 
     // This creates and positions a free camera (non-mesh)
     scene.createDefaultCamera(true, true, true);
     scene.activeCamera.alpha += Math.PI;
 
+    scene.stopAllAnimations();
+    scene.getAnimationGroupByName("fanRunning").start(true);
+
     if (ibl) {
-        scene.createDefaultEnvironment({ createGround: false, createSkybox: false });
+        scene.createDefaultEnvironment({ createSkybox: false, groundSize: 100 });
+
+        var light = new BABYLON.DirectionalLight("light", new BABYLON.Vector3(-1, -4, -2), scene);
+        light.position = new BABYLON.Vector3(20, 40, 20);
+
+        var shadowGenerator = new BABYLON.ShadowGenerator(1024, light);
+        shadowGenerator.addShadowCaster(model.meshes[0], true);
+
+    //    var skybox = BABYLON.MeshBuilder.CreateBox("skyBox", { size: 1000.0 }, scene);
+    //    var skyboxMaterial = new BABYLON.StandardMaterial("skyBox", scene);
+    //    skyboxMaterial.backFaceCulling = false;
+    //    skyboxMaterial.reflectionTexture = new BABYLON.CubeTexture("https://playground.babylonjs.com/textures/skybox", scene);
+    //    skyboxMaterial.reflectionTexture.coordinatesMode = BABYLON.Texture.SKYBOX_MODE;
+    //    skyboxMaterial.diffuseColor = new BABYLON.Color3(0, 0, 0);
+    //    skyboxMaterial.specularColor = new BABYLON.Color3(0, 0, 0);
+    //    skybox.material = skyboxMaterial;
     }
     else {
         scene.createDefaultLight(true);
@@ -153,9 +172,8 @@ CreateBoxAsync(scene).then(function () {
     }
 
     if (turntable) {
-        scene.beforeRender = function () {
-            scene.meshes[0].rotate(BABYLON.Vector3.Up(), 0.005 * scene.getAnimationRatio());
-        };
+        scene.activeCamera.useAutoRotationBehavior = true;
+        scene.activeCamera.autoRotationBehavior.idleRotationSpeed = 0.3;
     }
 
     if (logfps) {

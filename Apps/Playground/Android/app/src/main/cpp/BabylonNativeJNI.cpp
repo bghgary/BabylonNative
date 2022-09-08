@@ -22,7 +22,7 @@
 #include <Babylon/Polyfills/Console.h>
 #include <Babylon/Polyfills/Window.h>
 #include <Babylon/Polyfills/XMLHttpRequest.h>
-#include <Babylon/Polyfills/Canvas.h>
+//#include <Babylon/Polyfills/Canvas.h>
 
 namespace
 {
@@ -33,7 +33,7 @@ namespace
     Babylon::Plugins::NativeInput* g_nativeInput{};
     std::unique_ptr<Babylon::ScriptLoader> g_scriptLoader{};
     std::optional<Babylon::Plugins::NativeXr> g_nativeXr{};
-    std::unique_ptr<Babylon::Polyfills::Canvas> nativeCanvas{};
+//    std::unique_ptr<Babylon::Polyfills::Canvas> nativeCanvas{};
     bool g_isXrActive{};
 }
 
@@ -85,6 +85,7 @@ extern "C"
             graphicsConfig.Width = static_cast<size_t>(width);
             graphicsConfig.Height = static_cast<size_t>(height);
             g_device = Babylon::Graphics::Device::Create(graphicsConfig);
+            g_device->UpdateMSAA(4);
             g_deviceUpdate = std::make_unique<Babylon::Graphics::DeviceUpdate>(g_device->GetUpdate("update"));
             g_device->StartRenderingCurrentFrame();
             g_deviceUpdate->Start();
@@ -123,7 +124,7 @@ extern "C"
                 Babylon::Polyfills::Window::Initialize(env);
 
                 Babylon::Polyfills::XMLHttpRequest::Initialize(env);
-                nativeCanvas = std::make_unique <Babylon::Polyfills::Canvas>(Babylon::Polyfills::Canvas::Initialize(env));
+//                nativeCanvas = std::make_unique <Babylon::Polyfills::Canvas>(Babylon::Polyfills::Canvas::Initialize(env));
 
                 g_chromeDevTools = std::make_unique<Babylon::Plugins::ChromeDevTools>(Babylon::Plugins::ChromeDevTools::Initialize(env));
                 if (g_chromeDevTools->SupportsInspector())
