@@ -1,4 +1,4 @@
-var createScene = function () {
+var createScene = async function () {
 
     // This creates a basic Babylon Scene object (non-mesh)
     var scene = new BABYLON.Scene(engine);
@@ -9,12 +9,22 @@ var createScene = function () {
     hdrTexture.gammaSpace = false;
     scene.environmentTexture = hdrTexture;
 
+    var skybox = BABYLON.MeshBuilder.CreateBox("skyBox", { size: 1000.0 }, scene);
+    var skyboxMaterial = new BABYLON.StandardMaterial("skyBox", scene);
+    skyboxMaterial.backFaceCulling = false;
+    skyboxMaterial.reflectionTexture = new BABYLON.CubeTexture("https://playground.babylonjs.com/textures/skybox", scene);
+    skyboxMaterial.reflectionTexture.coordinatesMode = BABYLON.Texture.SKYBOX_MODE;
+    skyboxMaterial.diffuseColor = new BABYLON.Color3(0, 0, 0);
+    skyboxMaterial.specularColor = new BABYLON.Color3(0, 0, 0);
+    skybox.material = skyboxMaterial;
+
     // Camera
     var camera = new BABYLON.ArcRotateCamera("Camera", BABYLON.Tools.ToRadians(-120), BABYLON.Tools.ToRadians(80), 65, new BABYLON.Vector3(0, -15, 0), scene);
     camera.useAutoRotationBehavior = true;
     camera.autoRotationBehavior.idleRotationSpeed = 0.3;
 
     // Physics
+    await Ammo();
     scene.enablePhysics(new BABYLON.Vector3(0, -12, 0), new BABYLON.AmmoJSPlugin());
 
     // Lights
@@ -34,9 +44,7 @@ var createScene = function () {
 
     var marbleMaterialArray = [];
 
-    //engine.displayLoadingUI();
-
-    Promise.all([
+    await Promise.all([
         BABYLON.SceneLoader.AppendAsync("https://models.babylonjs.com/Marble/marble/marble.gltf"),
         BABYLON.SceneLoader.AppendAsync("https://models.babylonjs.com/Marble/marbleTower/marbleTower.gltf")
     ]).then(function () {
@@ -141,7 +149,6 @@ var createScene = function () {
                 }
             )
         );
-        //engine.hideLoadingUI();
     });
 
     // This is a function to create marbles: creating a mesh, adding a physics imposter, and adding an event trigger
