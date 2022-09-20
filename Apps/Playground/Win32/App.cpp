@@ -182,11 +182,6 @@ namespace
             loader.LoadScript("app:///Scripts/playground_runner.js");
         }
     }
-
-    void UpdateWindowSize(size_t width, size_t height)
-    {
-        device->UpdateSize(width, height);
-    }
 }
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
@@ -398,7 +393,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
             {
                 auto width = static_cast<size_t>(LOWORD(lParam));
                 auto height = static_cast<size_t>(HIWORD(lParam));
-                UpdateWindowSize(width, height);
+                device->UpdateSize(width, height);
             }
             break;
         }

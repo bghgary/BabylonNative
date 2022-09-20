@@ -2,10 +2,13 @@
 
 namespace Napi
 {
-    Napi::Value Eval(Napi::Env env, const char* source, const char* sourceUrl)
+    Value Eval(Env env, const char* source, const char* sourceUrl)
     {
         napi_value result;
-        NAPI_THROW_IF_FAILED(env, napi_run_script(env, Napi::String::New(env, source), sourceUrl, &result));
+        if (napi_run_script(env, String::New(env, source), sourceUrl, &result) != napi_ok)
+        {
+            throw env.GetAndClearPendingException();
+        }
         return{ env, result };
     }
 }

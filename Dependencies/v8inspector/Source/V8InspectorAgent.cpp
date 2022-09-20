@@ -571,7 +571,7 @@ namespace Babylon
 
                 if (tag == TAG_CONNECT)
                 {
-                    CHECK_EQ(State::kAccepting, state_);
+                    //CHECK_EQ(State::kAccepting, state_);
                     session_id_ = pair.first;
                     state_ = State::kConnected;
                     inspector_->connectFrontend();

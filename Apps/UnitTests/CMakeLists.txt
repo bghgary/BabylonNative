@@ -16,27 +16,35 @@ set(NPM_SCRIPTS
 
 set(ADDITIONAL_LIBRARIES "")
 
+set(SOURCES
+    "Shared/Tests.cpp"
+    "Shared/Tests.h")
+
 if(APPLE)
     find_library(JSCORE_LIBRARY JavaScriptCore)
     set(ADDITIONAL_LIBRARIES ${JSCORE_LIBRARY})
-    set(TEST_APP "Apple/App.mm")
+    set(SOURCES ${SOURCES} "Apple/App.mm")
 elseif(UNIX AND NOT ANDROID)
-    set(TEST_APP "X11/App.cpp")
+    set(SOURCES ${SOURCES} "X11/App.cpp")
 elseif(WIN32)
-    set(TEST_APP "Win32/App.cpp")
+    set(SOURCES ${SOURCES} "Win32/App.cpp")
 endif()
 
-add_executable(UnitTests ${LOCAL_SCRIPTS} ${NPM_SCRIPTS} ${TEST_APP})
+message("sources: ${SOURCES}")
+
+add_executable(UnitTests ${LOCAL_SCRIPTS} ${NPM_SCRIPTS} ${SOURCES})
 
 target_link_to_dependencies(UnitTests
-    UrlLib
-    AppRuntime
-    XMLHttpRequest
-    NativeEngine
-    ScriptLoader
-    Console
-    Window
-    Canvas
+    PRIVATE AppRuntime
+    PRIVATE Canvas
+    PRIVATE Console
+    PRIVATE ChromeDevTools
+    PRIVATE NativeEngine
+    PRIVATE Require
+    PRIVATE ScriptLoader
+    PRIVATE UrlLib
+    PRIVATE Window
+    PRIVATE XMLHttpRequest
     ${ADDITIONAL_LIBRARIES})
 
 add_test(NAME UnitTests COMMAND UnitTests)
@@ -53,3 +61,4 @@ endforeach()
 set_property(TARGET UnitTests PROPERTY FOLDER Apps)
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${LOCAL_SCRIPTS})
 source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR}/../node_modules PREFIX Scripts FILES ${NPM_SCRIPTS})
+source_group(TREE ${CMAKE_CURRENT_SOURCE_DIR} FILES ${SOURCES})
