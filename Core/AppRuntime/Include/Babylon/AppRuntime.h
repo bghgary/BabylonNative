@@ -44,6 +44,8 @@ namespace Babylon
 
         static void DefaultUnhandledExceptionHandler(const std::exception& error);
 
+        std::unique_ptr<WorkQueue> CreateWorkQueue();
+
         std::unique_ptr<WorkQueue> m_workQueue{};
         std::function<void(const std::exception&)> m_unhandledExceptionHandler{};
     };

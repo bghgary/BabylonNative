@@ -10,7 +10,7 @@ namespace Babylon
     }
 
     AppRuntime::AppRuntime(std::function<void(const std::exception&)> unhandledExceptionHandler)
-        : m_workQueue{std::make_unique<WorkQueue>([this] { RunPlatformTier(); })}
+        : m_workQueue{CreateWorkQueue()}
         , m_unhandledExceptionHandler{unhandledExceptionHandler}
     {
         Dispatch([this](Napi::Env env) {
@@ -61,5 +61,15 @@ namespace Babylon
                 }
             });
         });
+    }
+
+    std::unique_ptr<WorkQueue> AppRuntime::CreateWorkQueue()
+    {
+        auto workQueue = std::make_unique<WorkQueue>([this] { RunPlatformTier(); });
+
+        using namespace std::chrono_literals;
+        std::this_thread::sleep_for(10s);
+
+        return workQueue;
     }
 }
