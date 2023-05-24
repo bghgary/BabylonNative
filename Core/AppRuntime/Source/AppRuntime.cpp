@@ -70,6 +70,8 @@ namespace Babylon
         using namespace std::chrono_literals;
         std::this_thread::sleep_for(10s);
 
-        return workQueue;
+        // Purposefully avoid copy elision with std::move so that the repro will happen even in release.
+        // Copy elision will set the member variable immediately at the beginning of the function.
+        return std::move(workQueue);
     }
 }
