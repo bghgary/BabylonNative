@@ -1,4 +1,4 @@
-#include "AppRuntime.h"
+#include "AppRuntimeImpl.h"
 
 #include <Windows.h>
 
@@ -7,19 +7,19 @@
 
 namespace Babylon
 {
-    void AppRuntime::RunPlatformTier()
+    void AppRuntimeImpl::RunPlatformTier()
     {
         RunEnvironmentTier();
     }
 
-    void AppRuntime::DefaultUnhandledExceptionHandler(const std::exception& error)
+    void AppRuntimeImpl::DefaultUnhandledExceptionHandler(const std::exception& error)
     {
         std::stringstream ss{};
         ss << "Uncaught Error: " << error.what() << std::endl;
         OutputDebugStringA(ss.str().data());
     }
 
-    void AppRuntime::Execute(Dispatchable<void()> callback)
+    void AppRuntimeImpl::Execute(Dispatchable<void()> callback)
     {
         callback();
     }

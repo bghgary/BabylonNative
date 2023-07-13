@@ -1,59 +1,36 @@
 #include "AppRuntime.h"
-#include "WorkQueue.h"
-#include <Babylon/JsRuntime.h>
+#include "AppRuntimeImpl.h"
 
 namespace Babylon
 {
     AppRuntime::AppRuntime()
-        : AppRuntime{DefaultUnhandledExceptionHandler}
+        : m_impl{std::make_unique<AppRuntimeImpl>()}
     {
     }
 
     AppRuntime::AppRuntime(std::function<void(const std::exception&)> unhandledExceptionHandler)
-        : m_workQueue{std::make_unique<WorkQueue>([this] { RunPlatformTier(); })}
-        , m_unhandledExceptionHandler{unhandledExceptionHandler}
-    {
-        Dispatch([this](Napi::Env env) {
-            JsRuntime::CreateForJavaScript(env, [this](auto func) { Dispatch(std::move(func)); });
-        });
-    }
-
-    AppRuntime::~AppRuntime()
+        : m_impl{std::make_unique<AppRuntimeImpl>(unhandledExceptionHandler)}
     {
     }
 
-    void AppRuntime::Run(Napi::Env env)
-    {
-        m_workQueue->Run(env);
-    }
+    AppRuntime::~AppRuntime() = default;
+
+    // Move semantics
+    AppRuntime::AppRuntime(AppRuntime&&) noexcept = default;
+    AppRuntime& AppRuntime::operator=(AppRuntime&&) noexcept = default;
 
     void AppRuntime::Suspend()
     {
-        m_workQueue->Suspend();
+        m_impl->Suspend();
     }
 
     void AppRuntime::Resume()
     {
-        m_workQueue->Resume();
+        m_impl->Resume();
     }
 
-    void AppRuntime::Dispatch(Dispatchable<void(Napi::Env)> func)
+    void AppRuntime::Dispatch(Dispatchable<void(Napi::Env)> callback)
     {
-        m_workQueue->Append([this, func{std::move(func)}](Napi::Env env) mutable {
-            Execute([this, env, func{std::move(func)}]() mutable {
-                try
-                {
-                    func(env);
-                }
-                catch (const std::exception& error)
-                {
-                    m_unhandledExceptionHandler(error);
-                }
-                catch (...)
-                {
-                    std::abort();
-                }
-            });
-        });
+        m_impl->Dispatch(std::move(callback));
     }
 }
