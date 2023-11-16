@@ -1,5 +1,52 @@
 #include <Babylon/JsRuntime.h>
+#include <arcana/containers/weak_table.h>
 
+// JsRuntime::NativeObject
+namespace Babylon
+{
+    namespace
+    {
+        static constexpr auto JS_NATIVE_NAME = "_native";
+    }
+
+    Napi::Object JsRuntime::NativeObject::GetFromJavaScript(Napi::Env env)
+    {
+        return env.Global().Get(JS_NATIVE_NAME).As<Napi::Object>();
+    }
+}
+
+// JsRuntime::AsyncToken
+namespace Babylon
+{
+    JsRuntime::AsyncToken::AsyncToken(JsRuntime& runtime)
+        : m_runtime{&runtime}
+    {
+        ++m_runtime->m_numAsyncOperations;
+    }
+
+    JsRuntime::AsyncToken::~AsyncToken()
+    {
+        if (m_runtime)
+        {
+            --m_runtime->m_numAsyncOperations;
+        }
+    }
+
+    JsRuntime::AsyncToken::AsyncToken(AsyncToken&& other) noexcept
+        : m_runtime{other.m_runtime}
+    {
+        other.m_runtime = nullptr;
+    }
+
+    JsRuntime::AsyncToken& JsRuntime::AsyncToken::operator=(AsyncToken&& other) noexcept
+    {
+        AsyncToken::~AsyncToken();
+        std::swap(m_runtime, other.m_runtime);
+        return *this;
+    }
+}
+
+// JsRuntime
 namespace Babylon
 {
     namespace
@@ -17,17 +64,18 @@ namespace Babylon
         {
             global.Set(JS_WINDOW_NAME, global);
         }
-
-        auto jsNative = Napi::Object::New(env);
-        env.Global().Set(NativeObject::JS_NATIVE_NAME, jsNative);
-
-        Napi::Value jsRuntime = Napi::External<JsRuntime>::New(env, this, [](Napi::Env, JsRuntime* runtime) { delete runtime; });
-        jsNative.Set(JS_RUNTIME_NAME, jsRuntime);
     }
 
     JsRuntime& JsRuntime::CreateForJavaScript(Napi::Env env, DispatchFunctionT dispatchFunction)
     {
+        auto jsNative = Napi::Object::New(env);
+        env.Global().Set(JS_NATIVE_NAME, jsNative);
+
         auto* runtime = new JsRuntime(env, std::move(dispatchFunction));
+        Napi::Value jsRuntime = Napi::External<JsRuntime>::New(env, runtime, [](Napi::Env, JsRuntime* runtime) {
+            delete runtime;
+        });
+        jsNative.Set(JS_RUNTIME_NAME, jsRuntime);
         return *runtime;
     }
 
@@ -38,6 +86,11 @@ namespace Babylon
                     .Get(JS_RUNTIME_NAME)
                     .As<Napi::External<JsRuntime>>()
                     .Data();
+    }
+
+    JsRuntime::AsyncToken JsRuntime::GetAsyncToken(Napi::Env env)
+    {
+        return {JsRuntime::GetFromJavaScript(env)};
     }
 
     void JsRuntime::Dispatch(std::function<void(Napi::Env)> function)
@@ -54,5 +107,14 @@ namespace Babylon
                 throw env.GetAndClearPendingException();
             }
         });
+    }
+
+    void JsRuntime::Shutdown()
+    {
+        while (m_numAsyncOperations > 0)
+        {
+            using namespace std::chrono_literals;
+            std::this_thread::sleep_for(100ms);
+        }
     }
 }

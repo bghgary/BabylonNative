@@ -502,14 +502,13 @@ namespace Babylon
 
     NativeEngine::NativeEngine(const Napi::CallbackInfo& info, JsRuntime& runtime)
         : Napi::ObjectWrap<NativeEngine>{info}
-        , m_cancellationSource{std::make_shared<arcana::cancellation_source>()}
         , m_runtime{runtime}
         , m_graphicsContext{Graphics::DeviceContext::GetFromJavaScript(info.Env())}
         , m_update{m_graphicsContext.GetUpdate("update")}
         , m_runtimeScheduler{runtime}
         , m_defaultFrameBuffer{m_graphicsContext, BGFX_INVALID_HANDLE, 0, 0, true, true, true}
         , m_boundFrameBuffer{&m_defaultFrameBuffer}
-        , m_boundFrameBufferNeedsRebinding{m_graphicsContext, *m_cancellationSource, true}
+        , m_boundFrameBufferNeedsRebinding{m_graphicsContext, m_cancellationSource, true}
     {
     }
 
@@ -520,7 +519,7 @@ namespace Babylon
 
     void NativeEngine::Dispose()
     {
-        m_cancellationSource->cancel();
+        m_cancellationSource.cancel();
     }
 
     void NativeEngine::Dispose(const Napi::CallbackInfo& /*info*/)
@@ -688,7 +687,7 @@ namespace Babylon
         return vertexSource;
     }
 
-    std::unique_ptr<ProgramData> NativeEngine::CreateProgramInternal(const std::string vertexSource, const std::string fragmentSource)
+    std::unique_ptr<ProgramData> NativeEngine::CreateProgramInternal(const std::string& vertexSource, const std::string& fragmentSource)
     {
         ShaderCompiler::BgfxShaderInfo shaderInfo = m_shaderCompiler.Compile(ProcessShaderCoordinates(vertexSource), ProcessSamplerFlip(fragmentSource));
 
@@ -743,24 +742,49 @@ namespace Babylon
 
     Napi::Value NativeEngine::CreateProgramAsync(const Napi::CallbackInfo& info)
     {
-        const std::string vertexSource = info[0].As<Napi::String>().Utf8Value();
-        const std::string fragmentSource = info[1].As<Napi::String>().Utf8Value();
+        std::string vertexSource = info[0].As<Napi::String>().Utf8Value();
+        std::string fragmentSource = info[1].As<Napi::String>().Utf8Value();
         const Napi::Function onSuccess = info[2].As<Napi::Function>();
         const Napi::Function onError = info[3].As<Napi::Function>();
 
         ProgramData* program = new ProgramData{};
         Napi::Value jsProgram = Napi::Pointer<ProgramData>::Create(info.Env(), program, Napi::NapiPointerDeleter(program));
 
-        arcana::make_task(arcana::threadpool_scheduler, *m_cancellationSource,
-            [this, vertexSource, fragmentSource, cancellationSource{m_cancellationSource}]() -> std::unique_ptr<ProgramData> {
+
+        // Solution:
+        // 1. Use scheduler instances with ref counting.
+        // 2. Don't use cancellation sources for shut down scenarios.
+        // 3. Continue using persistent this to prevent GC.
+        // 4. Don't execute JS dispatch methods after shutdown sequence starts but destroy them on the JS thread.
+        //    We have confirmed that RN jscallinvoker will destroy lambdas on the JS thread even if it doesn't execute.
+        // Notes:
+        // - Cancellation sources not needed because the scheduler will execute between frames and cannot execute JS while in the JS shutdown sequence.
+        // - JsRuntime will block during the shutdown sequence and wait until all async operations are complete via the JsRuntimeScheduler ref count.
+
+        // - JS VM shutdown will destroy all JS host objects ignoring persistent requests. This means that, on shutdown, we have to wait for async operations
+        //   to complete in case the continuation accesses member variables.
+
+        // 1. Test scheduler ref count instead of async token.
+        // 2. Test on Android BRN (onCatalystInstanceDestroy)
+        // 3. Test on iOS BRN (invalidate)
+
+        arcana::make_task(arcana::threadpool_scheduler, arcana::cancellation::none(),
+            [this, vertexSource = std::move(vertexSource), fragmentSource = std::move(fragmentSource)]() -> std::unique_ptr<ProgramData> {
+                static bool s_wait = true;
+                while (s_wait)
+                {
+                    using namespace std::chrono_literals;
+                    std::this_thread::sleep_for(1s);
+                }
+
                 return CreateProgramInternal(vertexSource, fragmentSource);
             })
-            .then(m_runtimeScheduler, *m_cancellationSource,
-                [program,
-                    jsProgramRef{Napi::Persistent(jsProgram)},
-                    onSuccessRef{Napi::Persistent(onSuccess)},
-                    onErrorRef{Napi::Persistent(onError)},
-                    cancellationSource{m_cancellationSource}](const arcana::expected<std::unique_ptr<ProgramData>, std::exception_ptr>& result) {
+            .then(m_runtime.GetScheduler(), arcana::cancellation::none(),
+                [thisRef = Napi::Persistent(info.This()),
+                    program,
+                    jsProgramRef = Napi::Persistent(jsProgram),
+                    onSuccessRef = Napi::Persistent(onSuccess),
+                    onErrorRef = Napi::Persistent(onError)](const arcana::expected<std::unique_ptr<ProgramData>, std::exception_ptr>& result) {
                     if (result.has_error())
                     {
                         onErrorRef.Call({Napi::Error::New(onErrorRef.Env(), result.error()).Value()});
@@ -1110,13 +1134,13 @@ namespace Babylon
 
         const auto dataSpan = gsl::make_span(static_cast<uint8_t*>(data.ArrayBuffer().Data()) + data.ByteOffset(), data.ByteLength());
 
-        arcana::make_task(arcana::threadpool_scheduler, *m_cancellationSource,
-            [this, dataSpan, generateMips, invertY, srgb, texture, cancellationSource{m_cancellationSource}]() {
+        arcana::make_task(arcana::threadpool_scheduler, m_cancellationSource,
+            [this, dataSpan, generateMips, invertY, srgb, texture]() {
                 bimg::ImageContainer* image{ParseImage(m_allocator, dataSpan)};
                 image = PrepareImage(m_allocator, image, invertY, srgb, generateMips);
                 LoadTextureFromImage(texture, image, srgb);
             })
-            .then(m_runtimeScheduler, *m_cancellationSource, [dataRef{Napi::Persistent(data)}, onSuccessRef{Napi::Persistent(onSuccess)}, onErrorRef{Napi::Persistent(onError)}, cancellationSource{m_cancellationSource}](arcana::expected<void, std::exception_ptr> result) {
+            .then(m_runtimeScheduler, m_cancellationSource, [dataRef{Napi::Persistent(data)}, onSuccessRef{Napi::Persistent(onSuccess)}, onErrorRef{Napi::Persistent(onError)}](arcana::expected<void, std::exception_ptr> result) {
                 if (result.has_error())
                 {
                     onErrorRef.Call({});
@@ -1133,12 +1157,12 @@ namespace Babylon
         const auto textureDestination = info[0].As<Napi::Pointer<Graphics::Texture>>().Get();
         const auto textureSource = info[1].As<Napi::Pointer<Graphics::Texture>>().Get();
 
-        arcana::make_task(m_update.Scheduler(), *m_cancellationSource, [this, textureDestination, textureSource, cancellationSource = m_cancellationSource]() {
-            return arcana::make_task(m_runtimeScheduler, *m_cancellationSource, [this, textureDestination, textureSource, updateToken = m_update.GetUpdateToken(), cancellationSource = m_cancellationSource]() {
+        arcana::make_task(m_update.Scheduler(), m_cancellationSource, [this, textureDestination, textureSource]() {
+            return arcana::make_task(m_runtimeScheduler, m_cancellationSource, [this, textureDestination, textureSource, updateToken = m_update.GetUpdateToken()]() {
                 bgfx::Encoder* encoder = m_update.GetUpdateToken().GetEncoder();
                 GetBoundFrameBuffer(*encoder).Blit(*encoder, textureDestination->Handle(), 0, 0, textureSource->Handle());
-            }).then(arcana::inline_scheduler, *m_cancellationSource, [this, cancellationSource{m_cancellationSource}](const arcana::expected<void, std::exception_ptr>& result) {
-                if (!cancellationSource->cancelled() && result.has_error())
+            }).then(arcana::inline_scheduler, m_cancellationSource, [this](const arcana::expected<void, std::exception_ptr>& result) {
+                if (result.has_error())
                 {
                     Napi::Error::New(Env(), result.error()).ThrowAsJavaScriptException();
                 }
@@ -1229,7 +1253,7 @@ namespace Babylon
             const auto typedArray{data[face].As<Napi::TypedArray>()};
             const auto dataSpan{gsl::make_span(static_cast<uint8_t*>(typedArray.ArrayBuffer().Data()) + typedArray.ByteOffset(), typedArray.ByteLength())};
             dataRefs[face] = Napi::Persistent(typedArray);
-            tasks[face] = arcana::make_task(arcana::threadpool_scheduler, *m_cancellationSource, [this, dataSpan, invertY, generateMips, srgb]() {
+            tasks[face] = arcana::make_task(arcana::threadpool_scheduler, m_cancellationSource, [this, dataSpan, invertY, generateMips, srgb]() {
                 bimg::ImageContainer* image{ParseImage(m_allocator, dataSpan)};
                 image = PrepareImage(m_allocator, image, invertY, srgb, generateMips);
                 return image;
@@ -1237,10 +1261,10 @@ namespace Babylon
         }
 
         arcana::when_all(gsl::make_span(tasks))
-            .then(arcana::inline_scheduler, *m_cancellationSource, [texture, srgb, cancellationSource{m_cancellationSource}](std::vector<bimg::ImageContainer*> images) {
+            .then(arcana::inline_scheduler, m_cancellationSource, [texture, srgb](std::vector<bimg::ImageContainer*> images) {
                 LoadCubeTextureFromImages(texture, images, srgb);
             })
-            .then(m_runtimeScheduler, *m_cancellationSource, [dataRefs{std::move(dataRefs)}, onSuccessRef{Napi::Persistent(onSuccess)}, onErrorRef{Napi::Persistent(onError)}, cancellationSource{m_cancellationSource}](arcana::expected<void, std::exception_ptr> result) {
+            .then(m_runtimeScheduler, m_cancellationSource, [dataRefs{std::move(dataRefs)}, onSuccessRef{Napi::Persistent(onSuccess)}, onErrorRef{Napi::Persistent(onError)}](arcana::expected<void, std::exception_ptr> result) {
                 if (result.has_error())
                 {
                     onErrorRef.Call({});
@@ -1272,7 +1296,7 @@ namespace Babylon
                 const auto typedArray = faceData[face].As<Napi::TypedArray>();
                 const auto dataSpan = gsl::make_span(static_cast<uint8_t*>(typedArray.ArrayBuffer().Data()) + typedArray.ByteOffset(), typedArray.ByteLength());
                 dataRefs[(face * numMips) + mip] = Napi::Persistent(typedArray);
-                tasks[(face * numMips) + mip] = arcana::make_task(arcana::threadpool_scheduler, *m_cancellationSource, [this, dataSpan, invertY, srgb]() {
+                tasks[(face * numMips) + mip] = arcana::make_task(arcana::threadpool_scheduler, m_cancellationSource, [this, dataSpan, invertY, srgb]() {
                     bimg::ImageContainer* image{ParseImage(m_allocator, dataSpan)};
                     image = PrepareImage(m_allocator, image, invertY, srgb, false);
                     return image;
@@ -1281,10 +1305,10 @@ namespace Babylon
         }
 
         arcana::when_all(gsl::make_span(tasks))
-            .then(arcana::inline_scheduler, *m_cancellationSource, [texture, srgb, cancellationSource{m_cancellationSource}](std::vector<bimg::ImageContainer*> images) {
+            .then(arcana::inline_scheduler, m_cancellationSource, [texture, srgb](std::vector<bimg::ImageContainer*> images) {
                 LoadCubeTextureFromImages(texture, images, srgb);
             })
-            .then(m_runtimeScheduler, *m_cancellationSource, [dataRefs{std::move(dataRefs)}, onSuccessRef{Napi::Persistent(onSuccess)}, onErrorRef{Napi::Persistent(onError)}, cancellationSource{m_cancellationSource}](arcana::expected<void, std::exception_ptr> result) {
+            .then(m_runtimeScheduler, m_cancellationSource, [dataRefs{std::move(dataRefs)}, onSuccessRef{Napi::Persistent(onSuccess)}, onErrorRef{Napi::Persistent(onError)}](arcana::expected<void, std::exception_ptr> result) {
                 if (result.has_error())
                 {
                     onErrorRef.Call({});
@@ -1450,7 +1474,7 @@ namespace Babylon
 
             // Read the source texture.
             m_graphicsContext.ReadTextureAsync(sourceTextureHandle, textureBuffer, mipLevel)
-                .then(arcana::inline_scheduler, *m_cancellationSource, [this, textureBuffer{std::move(textureBuffer)}, sourceTextureInfo, targetTextureInfo]() mutable {
+                .then(arcana::inline_scheduler, m_cancellationSource, [this, textureBuffer{std::move(textureBuffer)}, sourceTextureInfo, targetTextureInfo]() mutable {
                     // If the source texture format does not match the target texture format, convert it.
                     if (targetTextureInfo.format != sourceTextureInfo.format)
                     {
@@ -1473,7 +1497,7 @@ namespace Babylon
 
                     return textureBuffer;
                 })
-                .then(m_runtimeScheduler, *m_cancellationSource, [this, bufferRef{Napi::Persistent(buffer)}, bufferOffset, deferred, tempTexture, sourceTextureHandle](std::vector<uint8_t> textureBuffer) mutable {
+                .then(m_runtimeScheduler, m_cancellationSource, [this, bufferRef{Napi::Persistent(buffer)}, bufferOffset, deferred, tempTexture, sourceTextureHandle](std::vector<uint8_t> textureBuffer) mutable {
                     // Double check the destination buffer length. This is redundant with prior checks, but we'll be extra sure before the memcpy.
                     assert(bufferRef.Value().ByteLength() - bufferOffset >= textureBuffer.size());
 
@@ -1483,7 +1507,7 @@ namespace Babylon
 
                     // Dispose of the texture handle before resolving the promise.
                     // TODO: Handle properly handle stale handles after BGFX shutdown
-                    if (tempTexture && !m_cancellationSource->cancelled())
+                    if (tempTexture && !m_cancellationSource.cancelled())
                     {
                         bgfx::destroy(sourceTextureHandle);
                         tempTexture = false;
@@ -1494,7 +1518,7 @@ namespace Babylon
                 .then(m_runtimeScheduler, arcana::cancellation::none(), [this, env, deferred, tempTexture, sourceTextureHandle](const arcana::expected<void, std::exception_ptr>& result) {
                     // Dispose of the texture handle if not yet disposed.
                     // TODO: Handle properly handle stale handles after BGFX shutdown
-                    if (tempTexture && !m_cancellationSource->cancelled())
+                    if (tempTexture && !m_cancellationSource.cancelled())
                     {
                         bgfx::destroy(sourceTextureHandle);
                     }
@@ -1966,8 +1990,8 @@ namespace Babylon
 
         m_requestAnimationFrameCallbacksScheduled = true;
 
-        arcana::make_task(m_update.Scheduler(), *m_cancellationSource, [this, cancellationSource{m_cancellationSource}]() {
-            return arcana::make_task(m_runtimeScheduler, *m_cancellationSource, [this, updateToken{m_update.GetUpdateToken()}, cancellationSource{m_cancellationSource}]() {
+        arcana::make_task(m_update.Scheduler(), m_cancellationSource, [this]() {
+            return arcana::make_task(m_runtimeScheduler, m_cancellationSource, [this, updateToken{m_update.GetUpdateToken()}]() {
                 m_requestAnimationFrameCallbacksScheduled = false;
 
                 arcana::trace_region scheduleRegion{"NativeEngine::ScheduleRequestAnimationFrameCallbacks invoke JS callbacks"};
@@ -1976,8 +2000,8 @@ namespace Babylon
                 {
                     callback.Value().Call({});
                 }
-            }).then(arcana::inline_scheduler, *m_cancellationSource, [this, cancellationSource{m_cancellationSource}](const arcana::expected<void, std::exception_ptr>& result) {
-                if (!cancellationSource->cancelled() && result.has_error())
+            }).then(arcana::inline_scheduler, m_cancellationSource, [this](const arcana::expected<void, std::exception_ptr>& result) {
+                if (result.has_error())
                 {
                     Napi::Error::New(Env(), result.error()).ThrowAsJavaScriptException();
                 }

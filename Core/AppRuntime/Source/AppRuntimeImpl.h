@@ -7,6 +7,8 @@
 
 namespace Babylon
 {
+    class JsRuntime;
+
     class AppRuntimeImpl
     {
     public:
@@ -64,5 +66,7 @@ namespace Babylon
         arcana::cancellation_source m_cancellationSource{};
         arcana::manual_dispatcher<128> m_dispatcher{};
         std::thread m_thread{};
+
+        JsRuntime* m_runtime{};
     };
 }

@@ -8,7 +8,7 @@ namespace Babylon
         , m_thread{[this] { RunPlatformTier(); }}
     {
         Dispatch([this](Napi::Env env) {
-            JsRuntime::CreateForJavaScript(env, [this](auto func) { Dispatch(std::move(func)); });
+            m_runtime = &JsRuntime::CreateForJavaScript(env, [this](auto func) { Dispatch(std::move(func)); });
         });
     }
 
@@ -18,6 +18,8 @@ namespace Babylon
         {
             m_suspensionLock.reset();
         }
+
+        m_runtime->Dispose();
 
         m_cancellationSource.cancel();
         m_thread.join();
