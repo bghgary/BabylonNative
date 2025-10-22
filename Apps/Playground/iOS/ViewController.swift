@@ -4,7 +4,6 @@ import MetalKit
 class ViewController: UIViewController {
 
     var mtkView: MTKView!
-    var xrView: MTKView!
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -42,8 +41,7 @@ class ViewController: UIViewController {
             mtkView,
             screenScale:Float(UIScreen.main.scale),
             width:Int32(width * scale),
-            height:Int32(height * scale),
-            xrView:Unmanaged.passUnretained(xrView).toOpaque()
+            height:Int32(height * scale)
         )
     }
   
@@ -54,14 +52,6 @@ class ViewController: UIViewController {
         view.addSubview(mtkView)
         view.addConstraints(NSLayoutConstraint.constraints(withVisualFormat: "|[mtkView]|", options: [], metrics: nil, views: ["mtkView" : mtkView]))
         view.addConstraints(NSLayoutConstraint.constraints(withVisualFormat: "V:|[mtkView]|", options: [], metrics: nil, views: ["mtkView" : mtkView]))
-        
-        xrView = MTKView()
-        xrView.translatesAutoresizingMaskIntoConstraints = false
-        xrView.isUserInteractionEnabled = false
-        xrView.isHidden = true
-        view.addSubview(xrView)
-        view.addConstraints(NSLayoutConstraint.constraints(withVisualFormat: "|[xrView]|", options: [], metrics: nil, views: ["xrView" : xrView]))
-        view.addConstraints(NSLayoutConstraint.constraints(withVisualFormat: "V:|[xrView]|", options: [], metrics: nil, views: ["xrView" : xrView]))
     }
 }
 
@@ -69,7 +59,6 @@ class ViewController: UIViewController {
 extension ViewController: MTKViewDelegate {
     func draw(in view: MTKView) {
         guard let appDelegate = UIApplication.shared.delegate as? AppDelegate else { return }
-        xrView.isHidden = !(appDelegate._bridge?.isXRActive() ?? false)
         appDelegate._bridge?.render()
     }
     

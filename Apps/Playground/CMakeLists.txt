@@ -26,7 +26,7 @@ if(APPLE)
             "${CMAKE_CURRENT_LIST_DIR}/iOS/Base.lproj/Main.storyboard"
             "${CMAKE_CURRENT_LIST_DIR}/iOS/Base.lproj/LaunchScreen.storyboard")
         set(RESOURCE_FILES ${STORYBOARD} ${SCRIPTS})
-        set(ADDITIONAL_LIBRARIES PRIVATE z NativeXr)
+        set(ADDITIONAL_LIBRARIES PRIVATE z)
         set(SOURCES
             ${SOURCES}
             "iOS/AppDelegate.swift"
@@ -36,7 +36,6 @@ if(APPLE)
             "AppleShared/GestureRecognizer.swift")
         set_source_files_properties(${SCRIPTS} ${BABYLON_SCRIPTS} ${DEPENDENCIES} PROPERTIES MACOSX_PACKAGE_LOCATION "Scripts")
         set_source_files_properties(${REFERENCE_IMAGES} PROPERTIES MACOSX_PACKAGE_LOCATION "ReferenceImages")
-        set(ADDITIONAL_LIBRARIES ${ADDITIONAL_LIBRARIES} PRIVATE NativeCamera)
     elseif(VISIONOS)
         set(PLIST_FILE
             "${CMAKE_CURRENT_LIST_DIR}/visionOS/Info.plist")
@@ -52,7 +51,6 @@ if(APPLE)
     else()
         set(PLIST_FILE "${CMAKE_CURRENT_LIST_DIR}/macOS/Info.plist")
         set(STORYBOARD "${CMAKE_CURRENT_LIST_DIR}/macOS/Base.lproj/Main.storyboard")
-        set(ADDITIONAL_LIBRARIES ${ADDITIONAL_LIBRARIES} PRIVATE NativeCamera)
         set(RESOURCE_FILES ${STORYBOARD})
         set(SOURCES
             ${SOURCES}
@@ -103,7 +101,6 @@ elseif(WIN32)
         "Win32/Resource.h"
         "Win32/small.ico"
         "Win32/targetver.h")
-    set(ADDITIONAL_LIBRARIES PRIVATE NativeCamera)
 endif()
 
 if(WIN32)
@@ -126,18 +123,14 @@ target_include_directories(Playground PRIVATE "Source" ".")
 
 target_link_libraries(Playground
     PRIVATE AppRuntime
-    PRIVATE Canvas
     PRIVATE Console
     PRIVATE ExternalTexture
     PRIVATE GraphicsDevice
-    PRIVATE NativeCapture
     PRIVATE NativeEngine
     PRIVATE NativeInput
-    PRIVATE NativeOptimizations
     PRIVATE ScriptLoader
     PRIVATE Window
     PRIVATE XMLHttpRequest
-    PRIVATE TestUtils
     ${ADDITIONAL_LIBRARIES}
     ${BABYLON_NATIVE_PLAYGROUND_EXTENSION_LIBRARIES})
 
