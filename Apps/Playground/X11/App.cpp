@@ -69,7 +69,13 @@ namespace
         device->StartRenderingCurrentFrame();
         update->Start();
 
-        runtime.emplace();
+        options.UnhandledExceptionHandler = [hWnd](const Napi::Error& error) {
+            std::ostringstream ss{};
+            ss << "[Uncaught Error] " << Napi::GetErrorString(error) << std::endl;
+            //OutputDebugStringA(ss.str().data());
+        };
+
+        runtime.emplace(options);
 
         runtime->Dispatch([window](Napi::Env env) {
             Babylon::Polyfills::Blob::Initialize(env);

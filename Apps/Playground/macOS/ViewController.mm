@@ -114,6 +114,17 @@ Babylon::Plugins::NativeInput* nativeInput{};
     device->StartRenderingCurrentFrame();
     update->Start();
 
+    options.UnhandledExceptionHandler = [hWnd](const Napi::Error& error) {
+        std::ostringstream ss{};
+        ss << "[Uncaught Error] " << Napi::GetErrorString(error) << std::endl;
+
+        NSLog(@"%s", ss.str().data());
+        std::cerr << ss.str();
+        std::cerr.flush();
+
+        std::quick_exit(1);
+    };
+
     runtime.emplace();
 
     runtime->Dispatch([engineView](Napi::Env env)
