@@ -46,7 +46,7 @@ Context::Context(Babylon::Graphics::WindowT window, size_t width, size_t height,
     Babylon::DebugTrace::EnableDebugTrace(true);
     Babylon::DebugTrace::SetTraceOutput([](const char* trace) {
         std::ostringstream ss{};
-        ss << "[Uncaught Error] " << trace << std::endl;
+        ss << trace << std::endl;
 
         //OutputDebugStringA(ss.str().data());
         std::cout << ss.str();

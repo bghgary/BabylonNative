@@ -2,10 +2,8 @@
 //
 
 #include "App.h"
-#include "Shared/Context.h"
-
+#include <Shared/Context.h>
 #include <Babylon/Plugins/TestUtils.h>
-
 #include <Windows.h>
 #include <Windowsx.h>
 #include <Shlwapi.h>
@@ -85,8 +83,9 @@ namespace
         auto width = static_cast<size_t>(rect.right - rect.left);
         auto height = static_cast<size_t>(rect.bottom - rect.top);
 
-        std::vector<std::string> args = GetCommandLineArguments();
         std::vector<std::string> scripts;
+
+        std::vector<std::string> args = GetCommandLineArguments();
         if (args.empty())
         {
             scripts.push_back("app:///Scripts/experience.js");
