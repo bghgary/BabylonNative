@@ -19,8 +19,8 @@ set(SCRIPTS
     "Scripts/config.json")
 
 set(SOURCES
-    "Shared/Context.cpp"
-    "Shared/Context.h")
+    "Shared/AppContext.cpp"
+    "Shared/AppContext.h")
 
 if(APPLE)
     find_library(JAVASCRIPTCORE_LIBRARY JavaScriptCore)

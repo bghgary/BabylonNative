@@ -1,8 +1,9 @@
-#include "Context.h"
+#include "AppContext.h"
 
 #include <Babylon/AppRuntime.h>
 #include <Babylon/DebugTrace.h>
 #include <Babylon/Graphics/Device.h>
+#include <Babylon/PerfTrace.h>
 #include <Babylon/ScriptLoader.h>
 #include <Babylon/ShaderCache.h>
 
@@ -41,17 +42,16 @@ namespace
     }
 }
 
-Context::Context(Babylon::Graphics::WindowT window, size_t width, size_t height, const std::vector<std::string>& scripts)
+AppContext::AppContext(
+    Babylon::Graphics::WindowT window,
+    size_t width,
+    size_t height,
+    DebugLogCallback debugLog,
+    AdditionalInitCallback additionalInit)
 {
     Babylon::DebugTrace::EnableDebugTrace(true);
-    Babylon::DebugTrace::SetTraceOutput([](const char* trace) {
-        std::ostringstream ss{};
-        ss << trace << std::endl;
-
-        //OutputDebugStringA(ss.str().data());
-        std::cout << ss.str();
-        std::cout.flush();
-    });
+    Babylon::DebugTrace::SetTraceOutput(debugLog);
+    Babylon::PerfTrace::SetLevel(Babylon::PerfTrace::Level::Mark);
 
     Babylon::Graphics::Configuration graphicsConfig{};
     graphicsConfig.Window = window;
@@ -71,31 +71,26 @@ Context::Context(Babylon::Graphics::WindowT window, size_t width, size_t height,
 
     options.EnableDebugger = true;
 
-    options.UnhandledExceptionHandler = [](const Napi::Error& error) {
+    options.UnhandledExceptionHandler = [debugLog](const Napi::Error& error) {
         std::ostringstream ss{};
-        ss << "[Uncaught Error] " << Napi::GetErrorString(error) << std::endl;
+        ss << "[Uncaught Error] " << Napi::GetErrorString(error);
 
-        //OutputDebugStringA(ss.str().data());
-        std::cerr << ss.str();
-        std::cerr.flush();
+        debugLog(ss.str().data());
 
         std::quick_exit(1);
     };
 
     m_runtime.emplace(options);
 
-    m_runtime->Dispatch([this, window](Napi::Env env) {
+    m_runtime->Dispatch([this, window, debugLog, additionalInit = std::move(additionalInit)](Napi::Env env) {
         m_device->AddToJavaScript(env);
 
         Babylon::Polyfills::Blob::Initialize(env);
 
-        Babylon::Polyfills::Console::Initialize(env, [](const char* message, Babylon::Polyfills::Console::LogLevel logLevel) {
+        Babylon::Polyfills::Console::Initialize(env, [debugLog](const char* message, Babylon::Polyfills::Console::LogLevel logLevel) {
             std::ostringstream ss{};
-            ss << "[" << GetLogLevelString(logLevel) << "] " << message << std::endl;
-
-            //OutputDebugStringA(ss.str().data());
-            std::cout << ss.str();
-            std::cout.flush();
+            ss << "[" << GetLogLevelString(logLevel) << "] " << message;
+            debugLog(ss.str().data());
         });
 
         Babylon::Polyfills::Window::Initialize(env);
@@ -117,26 +112,26 @@ Context::Context(Babylon::Graphics::WindowT window, size_t width, size_t height,
         m_input = &Babylon::Plugins::NativeInput::CreateForJavaScript(env);
 
         Babylon::Plugins::TestUtils::Initialize(env, window);
+
+        if (additionalInit)
+        {
+            additionalInit(env);
+        }
     });
 
-    Babylon::ScriptLoader loader{*m_runtime};
-    loader.LoadScript("app:///Scripts/ammo.js");
+    m_scriptLoader.emplace(*m_runtime);
+    m_scriptLoader->LoadScript("app:///Scripts/ammo.js");
     // Commenting out recast.js for now because v8jsi is incompatible with asm.js.
-    // loader.LoadScript("app:///Scripts/recast.js");
-    loader.LoadScript("app:///Scripts/babylon.max.js");
-    loader.LoadScript("app:///Scripts/babylonjs.loaders.js");
-    loader.LoadScript("app:///Scripts/babylonjs.materials.js");
-    loader.LoadScript("app:///Scripts/babylon.gui.js");
-    loader.LoadScript("app:///Scripts/meshwriter.min.js");
-    loader.LoadScript("app:///Scripts/babylonjs.serializers.js");
-
-    for (const auto& script : scripts)
-    {
-        loader.LoadScript(script);
-    }
+    // m_scriptLoader->LoadScript("app:///Scripts/recast.js");
+    m_scriptLoader->LoadScript("app:///Scripts/babylon.max.js");
+    m_scriptLoader->LoadScript("app:///Scripts/babylonjs.loaders.js");
+    m_scriptLoader->LoadScript("app:///Scripts/babylonjs.materials.js");
+    m_scriptLoader->LoadScript("app:///Scripts/babylon.gui.js");
+    m_scriptLoader->LoadScript("app:///Scripts/meshwriter.min.js");
+    m_scriptLoader->LoadScript("app:///Scripts/babylonjs.serializers.js");
 }
 
-Context::~Context()
+AppContext::~AppContext()
 {
     if (m_device)
     {
@@ -144,6 +139,7 @@ Context::~Context()
         m_device->FinishRenderingCurrentFrame();
     }
 
+    m_scriptLoader.reset();
     m_canvas.reset();
     m_input = {};
     m_runtime.reset();

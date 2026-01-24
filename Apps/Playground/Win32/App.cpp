@@ -2,7 +2,7 @@
 //
 
 #include "App.h"
-#include <Shared/Context.h>
+#include <Shared/AppContext.h>
 #include <Babylon/Plugins/TestUtils.h>
 #include <Windows.h>
 #include <Windowsx.h>
@@ -19,7 +19,7 @@
 HINSTANCE hInst;                     // current instance
 WCHAR szTitle[MAX_LOADSTRING];       // The title bar text
 WCHAR szWindowClass[MAX_LOADSTRING]; // the main window class name
-std::optional<Context> context{};
+std::optional<AppContext> appContext{};
 bool minimized{false};
 int buttonRefCount{0};
 
@@ -67,12 +67,12 @@ namespace
 
     void Uninitialize()
     {
-        context.reset();
+        appContext.reset();
     }
 
     void RefreshBabylon(HWND hWnd)
     {
-        context.reset();
+        appContext.reset();
 
         RECT rect;
         if (!GetClientRect(hWnd, &rect))
@@ -83,31 +83,38 @@ namespace
         auto width = static_cast<size_t>(rect.right - rect.left);
         auto height = static_cast<size_t>(rect.bottom - rect.top);
 
-        std::vector<std::string> scripts;
+        appContext.emplace(
+            hWnd,
+            width,
+            height,
+            [](const char* message) {
+                std::ostringstream ss{};
+                ss << message << std::endl;
+                OutputDebugStringA(ss.str().data());
+                std::cout << ss.str();
+            });
 
         std::vector<std::string> args = GetCommandLineArguments();
         if (args.empty())
         {
-            scripts.push_back("app:///Scripts/experience.js");
+            appContext->ScriptLoader().LoadScript("app:///Scripts/experience.js");
         }
         else
         {
             for (const auto& arg : args)
             {
-                scripts.push_back(GetUrlFromPath(arg));
+                appContext->ScriptLoader().LoadScript(GetUrlFromPath(arg));
             }
 
-            scripts.push_back("app:///Scripts/playground_runner.js");
+            appContext->ScriptLoader().LoadScript("app:///Scripts/playground_runner.js");
         }
-
-        context.emplace(hWnd, width, height, std::move(scripts));
     }
 
     void UpdateWindowSize(size_t width, size_t height)
     {
-        if (context)
+        if (appContext)
         {
-            context->Device().UpdateSize(width, height);
+            appContext->Device().UpdateSize(width, height);
         }
     }
 }
@@ -146,12 +153,12 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         }
         else
         {
-            if (context)
+            if (appContext)
             {
-                context->DeviceUpdate().Finish();
-                context->Device().FinishRenderingCurrentFrame();
-                context->Device().StartRenderingCurrentFrame();
-                context->DeviceUpdate().Start();
+                appContext->DeviceUpdate().Finish();
+                appContext->Device().FinishRenderingCurrentFrame();
+                appContext->Device().StartRenderingCurrentFrame();
+                appContext->DeviceUpdate().Start();
             }
 
             result = PeekMessage(&msg, nullptr, 0, 0, PM_REMOVE) && msg.message != WM_QUIT;
@@ -232,22 +239,22 @@ void ProcessMouseButtons(tagPOINTER_BUTTON_CHANGE_TYPE changeType, int x, int y)
     switch (changeType)
     {
         case POINTER_CHANGE_FIRSTBUTTON_DOWN:
-            context->Input().MouseDown(Babylon::Plugins::NativeInput::LEFT_MOUSE_BUTTON_ID, x, y);
+            appContext->Input().MouseDown(Babylon::Plugins::NativeInput::LEFT_MOUSE_BUTTON_ID, x, y);
             break;
         case POINTER_CHANGE_FIRSTBUTTON_UP:
-            context->Input().MouseUp(Babylon::Plugins::NativeInput::LEFT_MOUSE_BUTTON_ID, x, y);
+            appContext->Input().MouseUp(Babylon::Plugins::NativeInput::LEFT_MOUSE_BUTTON_ID, x, y);
             break;
         case POINTER_CHANGE_SECONDBUTTON_DOWN:
-            context->Input().MouseDown(Babylon::Plugins::NativeInput::RIGHT_MOUSE_BUTTON_ID, x, y);
+            appContext->Input().MouseDown(Babylon::Plugins::NativeInput::RIGHT_MOUSE_BUTTON_ID, x, y);
             break;
         case POINTER_CHANGE_SECONDBUTTON_UP:
-            context->Input().MouseUp(Babylon::Plugins::NativeInput::RIGHT_MOUSE_BUTTON_ID, x, y);
+            appContext->Input().MouseUp(Babylon::Plugins::NativeInput::RIGHT_MOUSE_BUTTON_ID, x, y);
             break;
         case POINTER_CHANGE_THIRDBUTTON_DOWN:
-            context->Input().MouseDown(Babylon::Plugins::NativeInput::MIDDLE_MOUSE_BUTTON_ID, x, y);
+            appContext->Input().MouseDown(Babylon::Plugins::NativeInput::MIDDLE_MOUSE_BUTTON_ID, x, y);
             break;
         case POINTER_CHANGE_THIRDBUTTON_UP:
-            context->Input().MouseUp(Babylon::Plugins::NativeInput::MIDDLE_MOUSE_BUTTON_ID, x, y);
+            appContext->Input().MouseUp(Babylon::Plugins::NativeInput::MIDDLE_MOUSE_BUTTON_ID, x, y);
             break;
     }
 }
@@ -270,12 +277,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         {
             if ((wParam & 0xFFF0) == SC_MINIMIZE)
             {
-                if (context)
+                if (appContext)
                 {
-                    context->DeviceUpdate().Finish();
-                    context->Device().FinishRenderingCurrentFrame();
+                    appContext->DeviceUpdate().Finish();
+                    appContext->Device().FinishRenderingCurrentFrame();
 
-                    context->Runtime().Suspend();
+                    appContext->Runtime().Suspend();
                 }
 
                 minimized = true;
@@ -286,12 +293,12 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                 {
                     minimized = false;
 
-                    if (context)
+                    if (appContext)
                     {
-                        context->Runtime().Resume();
+                        appContext->Runtime().Resume();
 
-                        context->Device().StartRenderingCurrentFrame();
-                        context->DeviceUpdate().Start();
+                        appContext->Device().StartRenderingCurrentFrame();
+                        appContext->DeviceUpdate().Start();
                     }
                 }
             }
@@ -338,15 +345,15 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         }
         case WM_POINTERWHEEL:
         {
-            if (context)
+            if (appContext)
             {
-                context->Input().MouseWheel(Babylon::Plugins::NativeInput::MOUSEWHEEL_Y_ID, -GET_WHEEL_DELTA_WPARAM(wParam));
+                appContext->Input().MouseWheel(Babylon::Plugins::NativeInput::MOUSEWHEEL_Y_ID, -GET_WHEEL_DELTA_WPARAM(wParam));
             }
             break;
         }
         case WM_POINTERDOWN:
         {
-            if (context)
+            if (appContext)
             {
                 POINTER_INFO info;
                 auto pointerId = GET_POINTERID_WPARAM(wParam);
@@ -363,7 +370,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                     }
                     else
                     {
-                        context->Input().TouchDown(pointerId, x, y);
+                        appContext->Input().TouchDown(pointerId, x, y);
                     }
                 }
             }
@@ -371,7 +378,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         }
         case WM_POINTERUPDATE:
         {
-            if (context)
+            if (appContext)
             {
                 auto pointerId = GET_POINTERID_WPARAM(wParam);
                 POINTER_INFO info;
@@ -385,11 +392,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                     if (info.pointerType == PT_MOUSE)
                     {
                         ProcessMouseButtons(info.ButtonChangeType, x, y);
-                        context->Input().MouseMove(x, y);
+                        appContext->Input().MouseMove(x, y);
                     }
                     else
                     {
-                        context->Input().TouchMove(pointerId, x, y);
+                        appContext->Input().TouchMove(pointerId, x, y);
                     }
                 }
             }
@@ -397,7 +404,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
         }
         case WM_POINTERUP:
         {
-            if (context)
+            if (appContext)
             {
                 auto pointerId = GET_POINTERID_WPARAM(wParam);
                 POINTER_INFO info;
@@ -414,7 +421,7 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
                     }
                     else
                     {
-                        context->Input().TouchUp(pointerId, x, y);
+                        appContext->Input().TouchUp(pointerId, x, y);
                     }
                 }
             }

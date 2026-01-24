@@ -1,6 +1,6 @@
 #pragma once
 
-#include <Shared/Context.h>
+#include <Shared/AppContext.h>
 #include <optional>
 
 // Main entry point for our app. Connects the app with the Windows shell and handles application lifecycle events.
@@ -39,7 +39,7 @@ private:
 
     void RestartRuntime(Windows::Foundation::Rect bounds);
 
-    std::optional<Context> m_context{};
+    std::optional<AppContext> m_appContext{};
 
     Windows::Foundation::Collections::IVectorView<Windows::Storage::IStorageItem^>^ m_files;
     bool m_windowClosed;

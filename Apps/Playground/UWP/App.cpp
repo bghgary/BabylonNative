@@ -138,12 +138,12 @@ void App::Run()
 {
     while (!m_windowClosed)
     {
-        if (m_context)
+        if (m_appContext)
         {
-            m_context->DeviceUpdate().Finish();
-            m_context->Device().FinishRenderingCurrentFrame();
-            m_context->Device().StartRenderingCurrentFrame();
-            m_context->DeviceUpdate().Start();
+            m_appContext->DeviceUpdate().Finish();
+            m_appContext->Device().FinishRenderingCurrentFrame();
+            m_appContext->Device().StartRenderingCurrentFrame();
+            m_appContext->DeviceUpdate().Start();
         }
 
         CoreWindow::GetForCurrentThread()->Dispatcher->ProcessEvents(CoreProcessEventsOption::ProcessAllIfPresent);
@@ -155,13 +155,13 @@ void App::Run()
 // class is torn down while the app is in the foreground.
 void App::Uninitialize()
 {
-    if (m_context)
+    if (m_appContext)
     {
-        m_context->DeviceUpdate().Finish();
-        m_context->Device().FinishRenderingCurrentFrame();
+        m_appContext->DeviceUpdate().Finish();
+        m_appContext->Device().FinishRenderingCurrentFrame();
     }
 
-    m_context.reset();
+    m_appContext.reset();
 }
 
 // Application lifecycle event handlers.
@@ -191,12 +191,12 @@ void App::OnSuspending(Platform::Object^ sender, SuspendingEventArgs^ args)
     // the app will be forced to exit.
     auto deferral = args->SuspendingOperation->GetDeferral();
 
-    if (m_context)
+    if (m_appContext)
     {
-        m_context->DeviceUpdate().Finish();
-        m_context->Device().FinishRenderingCurrentFrame();
+        m_appContext->DeviceUpdate().Finish();
+        m_appContext->Device().FinishRenderingCurrentFrame();
 
-        m_context->Runtime().Suspend();
+        m_appContext->Runtime().Suspend();
     }
 
     deferral->Complete();
@@ -204,15 +204,15 @@ void App::OnSuspending(Platform::Object^ sender, SuspendingEventArgs^ args)
 
 void App::OnResuming(Platform::Object^ sender, Platform::Object^ args)
 {
-    if (m_context)
+    if (m_appContext)
     {
         // Restore any data or state that was unloaded on suspend. By default, data
         // and state are persisted when resuming from suspend. Note that this event
         // does not occur if the app was previously terminated.
-        m_context->Runtime().Resume();
+        m_appContext->Runtime().Resume();
 
-        m_context->Device().StartRenderingCurrentFrame();
-        m_context->DeviceUpdate().Start();
+        m_appContext->Device().StartRenderingCurrentFrame();
+        m_appContext->DeviceUpdate().Start();
     }
 }
 
@@ -222,7 +222,7 @@ void App::OnWindowSizeChanged(CoreWindow^ /*sender*/, WindowSizeChangedEventArgs
 {
     size_t width = static_cast<size_t>(args->Size.Width * m_displayScale);
     size_t height = static_cast<size_t>(args->Size.Height * m_displayScale);
-    m_context->Device().UpdateSize(width, height);
+    m_appContext->Device().UpdateSize(width, height);
 }
 
 void App::OnVisibilityChanged(CoreWindow^ sender, VisibilityChangedEventArgs^ args)
@@ -238,7 +238,7 @@ void App::OnWindowClosed(CoreWindow^ sender, CoreWindowEventArgs^ args)
 
 void App::OnPointerMoved(CoreWindow^, PointerEventArgs^ args)
 {
-    if (m_context)
+    if (m_appContext)
     {
         const auto& position = args->CurrentPoint->RawPosition;
         const auto deviceType = args->CurrentPoint->PointerDevice->PointerDeviceType;
@@ -249,23 +249,23 @@ void App::OnPointerMoved(CoreWindow^, PointerEventArgs^ args)
 
         if (deviceType == Windows::Devices::Input::PointerDeviceType::Mouse)
         {
-            m_context->Input().MouseMove(x, y);
+            m_appContext->Input().MouseMove(x, y);
 
             if (args->CurrentPoint->IsInContact)
             {
-                ProcessMouseButtons(m_context->Input(), updateKind, x, y);
+                ProcessMouseButtons(m_appContext->Input(), updateKind, x, y);
             }
         }
         else
         {
-            m_context->Input().TouchMove(deviceSlot, x, y);
+            m_appContext->Input().TouchMove(deviceSlot, x, y);
         }
     }
 }
 
 void App::OnPointerPressed(CoreWindow^, PointerEventArgs^ args)
 {
-    if (m_context)
+    if (m_appContext)
     {
         const auto& position = args->CurrentPoint->RawPosition;
         const auto deviceType = args->CurrentPoint->PointerDevice->PointerDeviceType;
@@ -276,18 +276,18 @@ void App::OnPointerPressed(CoreWindow^, PointerEventArgs^ args)
 
         if (deviceType == Windows::Devices::Input::PointerDeviceType::Mouse)
         {
-            ProcessMouseButtons(m_context->Input(), updateKind, x, y);
+            ProcessMouseButtons(m_appContext->Input(), updateKind, x, y);
         }
         else
         {
-            m_context->Input().TouchDown(deviceSlot, x, y);
+            m_appContext->Input().TouchDown(deviceSlot, x, y);
         }
     }
 }
 
 void App::OnPointerReleased(CoreWindow^, PointerEventArgs^ args)
 {
-    if (m_context)
+    if (m_appContext)
     {
         const auto& position = args->CurrentPoint->RawPosition;
         const auto deviceType = args->CurrentPoint->PointerDevice->PointerDeviceType;
@@ -298,20 +298,20 @@ void App::OnPointerReleased(CoreWindow^, PointerEventArgs^ args)
 
         if (deviceType == Windows::Devices::Input::PointerDeviceType::Mouse)
         {
-            ProcessMouseButtons(m_context->Input(), updateKind, x, y);
+            ProcessMouseButtons(m_appContext->Input(), updateKind, x, y);
         }
         else
         {
-            m_context->Input().TouchUp(deviceSlot, x, y);
+            m_appContext->Input().TouchUp(deviceSlot, x, y);
         }
     }
 }
 void App::OnPointerWheelChanged(CoreWindow^, PointerEventArgs^ args)
 {
-    if (m_context)
+    if (m_appContext)
     {
         const auto delta = args->CurrentPoint->Properties->MouseWheelDelta;
-        m_context->Input().MouseWheel(Babylon::Plugins::NativeInput::MOUSEWHEEL_Y_ID, -delta);
+        m_appContext->Input().MouseWheel(Babylon::Plugins::NativeInput::MOUSEWHEEL_Y_ID, -delta);
     }
 }
 
@@ -354,11 +354,20 @@ void App::RestartRuntime(Windows::Foundation::Rect bounds)
     size_t height = static_cast<size_t>(bounds.Height * m_displayScale);
     auto window = from_cx<winrt::Windows::Foundation::IInspectable>(CoreWindow::GetForCurrentThread());
 
-    std::vector<std::string> scripts;
+    m_appContext.emplace(
+        window,
+        width,
+        height,
+        [](const char* message) {
+            std::ostringstream ss{};
+            ss << message << std::endl;
+            OutputDebugStringA(ss.str().data());
+            std::cout << ss.str();
+        });
 
     if (m_files == nullptr)
     {
-        scripts.push_back("app:///Scripts/experience.js");
+        m_appContext->ScriptLoader().LoadScript("app:///Scripts/experience.js");
     }
     else
     {
@@ -368,11 +377,9 @@ void App::RestartRuntime(Windows::Foundation::Rect bounds)
 
             // There is no built-in way to convert a local file path to a url in UWP, but
             // Foundation::Uri works with a url constructed using "file:///" with a local path.
-            scripts.push_back("file:///" + winrt::to_string(file->Path->Data()));
+            m_appContext->ScriptLoader().LoadScript("file:///" + winrt::to_string(file->Path->Data()));
         }
 
-        scripts.push_back("app:///Scripts/playground_runner.js");
+        m_appContext->ScriptLoader().LoadScript("app:///Scripts/playground_runner.js");
     }
-
-    m_context.emplace(window, width, height, std::move(scripts));
 }
