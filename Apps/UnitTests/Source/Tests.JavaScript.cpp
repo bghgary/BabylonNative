@@ -88,20 +88,25 @@ TEST(JavaScript, All)
     loader.LoadScript("app:///Assets/tests.javaScript.all.js");
 
     device.StartRenderingCurrentFrame();
-    device.FinishRenderingCurrentFrame();
 
     // Pump frames while JS tests run — tests use RAF internally and
-    // SubmitCommands requires an active frame.
+    // SubmitCommands requires an active frame (the FrameCompletionScope
+    // gate is open only between StartRenderingCurrentFrame and
+    // FinishRenderingCurrentFrame). The gate is held OPEN during the
+    // wait_for so that JS thread submits/scope-acquires can land at any
+    // point in the wait, then briefly closed each iteration to allow
+    // bgfx::frame() to advance. Without this pattern the open window
+    // collapses to ~zero between back-to-back Start/Finish calls and
+    // JS-thread work has to win a scheduler race against the pump
+    // thread to land its scope before the gate closes — that race is
+    // lost frequently on contended CI runners and produces 4-30x
+    // runtime variance for the same code.
     auto exitCodeFuture = exitCodePromise.get_future();
     while (exitCodeFuture.wait_for(std::chrono::milliseconds(16)) != std::future_status::ready)
     {
-        device.StartRenderingCurrentFrame();
         device.FinishRenderingCurrentFrame();
+        device.StartRenderingCurrentFrame();
     }
-
-    // Keep the frame open during shutdown so any pending JS work
-    // (e.g., SubmitCommands acquiring a FrameCompletionScope) can complete.
-    device.StartRenderingCurrentFrame();
 
     auto exitCode = exitCodeFuture.get();
     EXPECT_EQ(exitCode, 0);
