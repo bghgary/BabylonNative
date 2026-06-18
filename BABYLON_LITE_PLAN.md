@@ -645,7 +645,7 @@ The relevant comparison is therefore not *Lite's JS bundle* but *Babylon Native'
 ### Where Dawn's size is bad for BN-Lite
 
 1. **Spirit mismatch.** Lite's brand promise is "fraction of the bundle size." Even with the JS/native distinction, shipping a 10+ MB WebGPU runtime on every native target inverts the marketing more than it inverts the engineering.
-2. **Mobile sensitivity.** Office/Outlook/Teams-class consumers are size-conscious (cellular download caps; iOS warns at 200 MB; corporate device storage limits). +10 MB per architecture compounds across multi-ABI Android builds.
+2. **Mobile sensitivity.** Some consumers are size-conscious (cellular download caps; iOS warns at 200 MB; corporate device storage limits). +10 MB per architecture compounds across multi-ABI Android builds.
 3. **bgfx coexistence period.** Short-to-medium term, BN ships *both* bgfx and Dawn. That's the worst-case footprint.
 4. **Branimir's "build a little small" point.** This was originally his shader-compiler argument; it generalizes: don't ship the whole world if you don't need the whole world.
 5. **Tint inside Dawn.** ~2–3 MB of Dawn is the WGSL→HLSL/MSL/SPIR-V translator. Useful to have at runtime *only if* you accept dynamic shader composition (Lite does today). Pre-compiled-shader scenarios (Branimir's argument) don't need it — but Lite's current architecture does.
