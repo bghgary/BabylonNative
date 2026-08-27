@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <memory>
 #include <map>
+#include <set>
 #include <string>
 
 namespace Babylon::ShaderCompilerTraversers
@@ -67,6 +68,10 @@ namespace Babylon::ShaderCompilerTraversers
     /// that all uniforms, even scalars, are implemented as vec4 uniforms.
     /// It's not mandatory for D3D11 but it is for D3D12.
     ScopeT ChangeUniformTypes(glslang::TProgram& program, IdGenerator& ids);
+
+    /// Converts external-image samplers to ordinary 2D samplers before SPIR-V emission and
+    /// returns the active external sampler names so the OpenGL backend can restore their ESSL type.
+    std::set<std::string> ConvertExternalSamplersTo2D(glslang::TProgram& program, EShLanguage stage);
 
     /// Changes the names and locations of varying attributes in the vertex shader to
     /// match bgfx's expectations.

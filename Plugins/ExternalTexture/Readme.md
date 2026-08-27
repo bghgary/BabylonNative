@@ -74,6 +74,14 @@ It is safe to create multiple JS objects from the same `Babylon::Plugins::Extern
 
 Once the JS texture is available on the JS side, use `engine.wrapNativeTexture` to create an Babylon.js `InternalTexture`.
 
+## Android OpenGL external images
+
+An Android `SurfaceTexture` or hardware decoder exposes a `GL_TEXTURE_EXTERNAL_OES` name. Describe that name with `Babylon::Graphics::GL::Texture::Target::ExternalOES`, then pass the texture through `ExternalTexture::CreateForJavaScript` and `engine.wrapNativeTexture` as usual.
+
+The fragment shader must enable `GL_OES_EGL_image_external_essl3` and declare the corresponding uniform as `samplerExternalOES`. External images are sampled-only, single-layer, single-mip textures. Babylon Native forces clamp wrapping and a legal nearest or linear filter; it reports an error if the required OpenGL ES extensions are unavailable. The producer remains responsible for calling `SurfaceTexture.updateTexImage()` on the graphics context and applying the transform from `SurfaceTexture.getTransformMatrix()`.
+
+The release callback on `GL::Texture::Create` controls ownership. Leave it empty when the producer owns the OpenGL texture name. To replace the wrapped name with `ExternalTexture::Update`, describe the replacement texture with `Target::ExternalOES` too.
+
 ## Example 1: Copy rendering content (D3D12)
 
 The following example shows how to read back the content of a frame buffer that was created using D3D12 and provided as a render target to Babylon Native using a External texture. The internal ```ID3D12CommandQueue``` used by Babylon Native can be retrived by calling ```ID3D12Device::GetPrivateData```. Once the hosting application has access to the command ```ID3D12CommandQueue``` it can create a new command list to copy the content of the frame buffer ```ID3D12Resource``` to CPU visible memory.

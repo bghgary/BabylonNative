@@ -105,6 +105,12 @@ if(GRAPHICS_API STREQUAL "D3D12")
 endif()
 
 if(GRAPHICS_API STREQUAL "OpenGL")
+    target_sources(UnitTests PRIVATE "Source/Tests.ExternalTexture.OpenGL.cpp")
+    if(TARGET ShaderCompilerInternal)
+        target_link_libraries(UnitTests PRIVATE ShaderCompilerInternal)
+        target_compile_definitions(UnitTests PRIVATE HAS_SHADER_COMPILER)
+    endif()
+
     # Multisample: bgfx backs an MSAA render target with a renderbuffer it allocates itself,
     # so an imported texture never receives the resolved pixels. Rendering into the caller's
     # texture instead needs GL_TEXTURE_2D_MULTISAMPLE, which is ES 3.1, while Babylon Native

@@ -26,7 +26,11 @@ namespace
         program.addShader(&shader);
     }
 
-    std::pair<std::unique_ptr<spirv_cross::Parser>, std::unique_ptr<spirv_cross::Compiler>> CompileShader(glslang::TProgram& program, EShLanguage stage, std::string& glsl)
+    std::pair<std::unique_ptr<spirv_cross::Parser>, std::unique_ptr<spirv_cross::Compiler>> CompileShader(
+        glslang::TProgram& program,
+        EShLanguage stage,
+        std::string& glsl,
+        const std::set<std::string>& externalSamplerNames = {})
     {
         std::vector<uint32_t> spirv;
         glslang::GlslangToSpv(*program.getIntermediate(stage), spirv);
@@ -34,14 +38,45 @@ namespace
         auto parser = std::make_unique<spirv_cross::Parser>(std::move(spirv));
         parser->parse();
 
-        auto compiler = std::make_unique<spirv_cross::CompilerGLSL>(parser->get_parsed_ir());
+        const auto createCompiler = [&parser]() {
+            auto compiler = std::make_unique<spirv_cross::CompilerGLSL>(parser->get_parsed_ir());
+            auto options = compiler->get_common_options();
+            options.version = 300;
+            options.es = true;
+            compiler->set_common_options(options);
+            return compiler;
+        };
 
-        spirv_cross::CompilerGLSL::Options options = compiler->get_common_options();
+        auto compiler = createCompiler();
 
-        options.version = 300;
-        options.es = true;
+        if (!externalSamplerNames.empty())
+        {
+            compiler->compile();
 
-        compiler->set_common_options(options);
+            std::set<std::string> emittedExternalSamplerNames{};
+            for (const auto& metadata : parser->get_parsed_ir().meta)
+            {
+                const auto id = metadata.first;
+                if (externalSamplerNames.contains(parser->get_parsed_ir().get_name(id)))
+                {
+                    emittedExternalSamplerNames.emplace(compiler->get_name(id));
+                }
+            }
+
+            compiler = createCompiler();
+            compiler->require_extension("GL_OES_EGL_image_external_essl3");
+            compiler->set_variable_type_remap_callback(
+                [emittedExternalSamplerNames = std::move(emittedExternalSamplerNames)](
+                    const spirv_cross::SPIRType& type,
+                    const std::string& variableName,
+                    std::string& typeName) {
+                    if (type.basetype == spirv_cross::SPIRType::SampledImage &&
+                        emittedExternalSamplerNames.contains(variableName))
+                    {
+                        typeName = "samplerExternalOES";
+                    }
+                });
+        }
 
         glsl = compiler->compile();
 
@@ -85,6 +120,11 @@ namespace Babylon::Plugins
 
         ShaderCompilerTraversers::IdGenerator ids{};
         auto cutScope = ShaderCompilerTraversers::ChangeUniformTypes(program, ids);
+        if (!ShaderCompilerTraversers::ConvertExternalSamplersTo2D(program, EShLangVertex).empty())
+        {
+            throw std::runtime_error{"ShaderCompiler: samplerExternalOES is only supported in fragment shaders"};
+        }
+        const auto externalSamplerNames = ShaderCompilerTraversers::ConvertExternalSamplersTo2D(program, EShLangFragment);
         std::map<std::string, std::string> vertexAttributeRenaming = {};
         ShaderCompilerTraversers::AssignLocationsAndNamesToVertexVaryingsOpenGL(program, ids, vertexAttributeRenaming, instancedAttributes);
 
@@ -92,7 +132,7 @@ namespace Babylon::Plugins
         auto [vertexParser, vertexCompiler] = CompileShader(program, EShLangVertex, vertexGLSL);
 
         std::string fragmentGLSL(fragmentSource.data(), fragmentSource.size());
-        auto [fragmentParser, fragmentCompiler] = CompileShader(program, EShLangFragment, fragmentGLSL);
+        auto [fragmentParser, fragmentCompiler] = CompileShader(program, EShLangFragment, fragmentGLSL, externalSamplerNames);
 
         return CreateBgfxShader(
             {std::move(vertexParser), std::move(vertexCompiler), gsl::make_span(reinterpret_cast<uint8_t*>(vertexGLSL.data()), vertexGLSL.size()), std::move(vertexAttributeRenaming)},

@@ -137,7 +137,8 @@ set(SKIP_GLSLANG_INSTALL ON)
 # BABYLON_NATIVE_DISABLE_WEBMIN is used to disable WebMin in both glslang and SPIRV-Cross.
 # This flag should be removed when the code coverage in these library corresponds to exactly what we use in Babylon.js
 # and webGL2 glsl. 
-if(BABYLON_NATIVE_DISABLE_WEBMIN)
+# WebMin omits extension handling, including samplerExternalOES parsing.
+if(BABYLON_NATIVE_DISABLE_WEBMIN OR GRAPHICS_API STREQUAL "OpenGL")
     set(ENABLE_GLSLANG_WEBMIN OFF)
 else()
     set(ENABLE_GLSLANG_WEBMIN ON)

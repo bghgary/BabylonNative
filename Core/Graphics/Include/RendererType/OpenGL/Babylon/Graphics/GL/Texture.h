@@ -40,6 +40,12 @@ namespace Babylon::Graphics::GL
             RenderTarget,
         };
 
+        enum class Target
+        {
+            Automatic,
+            ExternalOES,
+        };
+
         // Describes the image a Texture stands for. Every property is named at the call site, so
         // a field can be added without silently changing what an existing call means:
         //
@@ -49,8 +55,8 @@ namespace Babylon::Graphics::GL
         // unsigned int so this header stays independent of any GL headers.
         //
         // Layers is the number of array slices: 1 for a GL_TEXTURE_2D image, more for a
-        // GL_TEXTURE_2D_ARRAY one. The target is derived from it rather than described, so the
-        // caller never has to name a GL enum.
+        // GL_TEXTURE_2D_ARRAY one. Automatic derives the target from Layers as before;
+        // ExternalOES opts into the Android external-image restrictions.
         struct Descriptor
         {
             unsigned int Handle{};
@@ -59,6 +65,7 @@ namespace Babylon::Graphics::GL
             uint32_t Layers{1};
             unsigned int Format{};
             Texture::Usage Usage{Texture::Usage::Sampled};
+            Texture::Target Target{Texture::Target::Automatic};
         };
 
         static Texture* Create(const Descriptor& descriptor, std::function<void(unsigned int)> release = {})
@@ -90,6 +97,7 @@ namespace Babylon::Graphics::GL
         uint32_t Layers() const noexcept { return m_descriptor.Layers; }
         unsigned int Format() const noexcept { return m_descriptor.Format; }
         bool IsRenderTarget() const noexcept { return m_descriptor.Usage == Usage::RenderTarget; }
+        Texture::Target TextureTarget() const noexcept { return m_descriptor.Target; }
 
         Texture(const Texture&) = delete;
         Texture& operator=(const Texture&) = delete;

@@ -13,6 +13,8 @@
 
 #include <gsl/gsl>
 
+#include <map>
+#include <set>
 #include <stdexcept>
 #include <string>
 #include <arcana/macros.h>
@@ -102,6 +104,98 @@ namespace Babylon::ShaderCompilerTraversers
             auto* agg = path.size() > 1 ? path[1]->getAsAggregate() : nullptr;
             return agg && agg->getOp() == EOpLinkerObjects;
         }
+
+        class ExternalSamplerTypeTraverser final : private TIntermTraverser
+        {
+        public:
+            static std::set<std::string> Traverse(TIntermediate* intermediate)
+            {
+                ExternalSamplerTypeTraverser traverser{};
+                intermediate->getTreeRoot()->traverse(&traverser);
+
+                std::set<std::string> externalNames{};
+                std::set<std::string> ordinaryNames{};
+                for (const auto& [id, sampler] : traverser.m_samplers)
+                {
+                    BX_UNUSED(id);
+                    (sampler.External ? externalNames : ordinaryNames).emplace(sampler.Name);
+                }
+
+                for (const auto& name : externalNames)
+                {
+                    if (ordinaryNames.contains(name))
+                    {
+                        throw std::runtime_error{
+                            "ShaderCompiler: samplerExternalOES declaration conflicts with sampler2D declaration named '" + name + "'"};
+                    }
+                }
+
+                return externalNames;
+            }
+
+        private:
+            struct Sampler
+            {
+                std::string Name{};
+                bool External{};
+            };
+
+            void visitSymbol(TIntermSymbol* symbol) override
+            {
+                const auto& type = symbol->getType();
+                if (type.getBasicType() != EbtSampler ||
+                    !type.getSampler().isCombined() ||
+                    type.getSampler().dim != Esd2D)
+                {
+                    return;
+                }
+
+                auto& sampler = m_samplers[symbol->getId()];
+                sampler.Name = symbol->getName().c_str();
+                sampler.External = sampler.External || type.getSampler().isExternal();
+                ConvertType(symbol);
+            }
+
+            void visitConstantUnion(TIntermConstantUnion* node) override
+            {
+                ConvertType(node);
+            }
+
+            bool visitBinary(TVisit, TIntermBinary* node) override
+            {
+                ConvertType(node);
+                return true;
+            }
+
+            bool visitUnary(TVisit, TIntermUnary* node) override
+            {
+                ConvertType(node);
+                return true;
+            }
+
+            bool visitSelection(TVisit, TIntermSelection* node) override
+            {
+                ConvertType(node);
+                return true;
+            }
+
+            bool visitAggregate(TVisit, TIntermAggregate* node) override
+            {
+                ConvertType(node);
+                return true;
+            }
+
+            static void ConvertType(TIntermTyped* node)
+            {
+                auto& type = node->getWritableType();
+                if (type.getBasicType() == EbtSampler && type.getSampler().isExternal())
+                {
+                    type.getSampler().setExternal(false);
+                }
+            }
+
+            std::map<long long, Sampler> m_samplers{};
+        };
 
         /// This traverser collects all non-sampler uniforms and creates a new struct
         /// called "Frame" to contain them. This is necessary to correctly transpile
@@ -1995,6 +2089,11 @@ namespace Babylon::ShaderCompilerTraversers
     ScopeT ChangeUniformTypes(TProgram& program, IdGenerator& ids)
     {
         return UniformTypeChangeTraverser::Traverse(program, ids);
+    }
+
+    std::set<std::string> ConvertExternalSamplersTo2D(TProgram& program, EShLanguage stage)
+    {
+        return ExternalSamplerTypeTraverser::Traverse(program.getIntermediate(stage));
     }
 
     void AssignLocationsAndNamesToVertexVaryingsOpenGL(TProgram& program, IdGenerator& ids, std::map<std::string, std::string>& replacementToOriginalName, const std::map<std::string, uint32_t>& instancedAttributes)

@@ -8,6 +8,7 @@
 #include <bgfx/bgfx.h>
 
 #include <algorithm>
+#include <cstring>
 
 // This backend runs on BabylonNative's OpenGL ES 3.0 context, so it uses only
 // ES 3.0 entry points. Neither the dimensions nor the internal format can be
@@ -242,6 +243,25 @@
 
 namespace Babylon::Plugins
 {
+    namespace
+    {
+        bool HasExtension(const char* name)
+        {
+            GLint count{};
+            glGetIntegerv(GL_NUM_EXTENSIONS, &count);
+            for (GLint index = 0; index < count; ++index)
+            {
+                const auto* extension = reinterpret_cast<const char*>(glGetStringi(GL_EXTENSIONS, static_cast<GLuint>(index)));
+                if (extension != nullptr && std::strcmp(extension, name) == 0)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+    }
+
     uintptr_t NativeTextureHandle(Graphics::TextureT ptr)
     {
         return ptr == nullptr ? 0 : static_cast<uintptr_t>(ptr->Handle());
@@ -416,6 +436,25 @@ namespace Babylon::Plugins
             if (ptr->Width() == 0 || ptr->Height() == 0)
             {
                 throw std::runtime_error{"ExternalTexture: OpenGL texture has degenerate dimensions"};
+            }
+
+            if (ptr->TextureTarget() == Graphics::GL::Texture::Target::ExternalOES)
+            {
+                if (ptr->Layers() != 1)
+                {
+                    throw std::runtime_error{"ExternalTexture: GL_TEXTURE_EXTERNAL_OES requires exactly one layer"};
+                }
+
+                if (ptr->IsRenderTarget())
+                {
+                    throw std::runtime_error{"ExternalTexture: GL_TEXTURE_EXTERNAL_OES is sampled-only"};
+                }
+
+                if (!HasExtension("GL_OES_EGL_image_external") ||
+                    !HasExtension("GL_OES_EGL_image_external_essl3"))
+                {
+                    throw std::runtime_error{"ExternalTexture: GL_TEXTURE_EXTERNAL_OES requires GL_OES_EGL_image_external and GL_OES_EGL_image_external_essl3"};
+                }
             }
 
             info.Width = static_cast<uint16_t>(ptr->Width());
