@@ -27,11 +27,13 @@ set(SOURCES
     "Source/App.cpp"
     "Source/Tests.Device.FrameEncoder.cpp"
     "Source/Tests.ExternalTexture.cpp"
+    "Source/Tests.ExternalTexture.Lifecycle.cpp"
     "Source/Tests.ExternalTexture.DeviceLoss.cpp"
     "Source/Tests.ExternalTexture.LayerCount.cpp"
     "Source/Tests.ExternalTexture.Msaa.cpp"
     "Source/Tests.ExternalTexture.Render.cpp"
     "Source/Tests.JavaScript.cpp"
+    "Source/Tests.NativeEngine.InstanceData.cpp"
     "Source/Tests.NativeEngine.Teardown.cpp"
     "Source/Tests.ShaderCache.cpp"
     "Source/Tests.ShaderCompilation.cpp"
@@ -69,6 +71,7 @@ elseif(WIN32)
 endif()
 
 add_executable(UnitTests ${BABYLONJS_ASSETS} ${BABYLONJS_MATERIALS_ASSETS} ${TEST_ASSETS} ${TEST_SCRIPTS} ${SOURCES})
+target_include_directories(UnitTests PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/../../Plugins/NativeEngine/Source")
 target_link_libraries(UnitTests
     PRIVATE AppRuntime
     PRIVATE Blob
