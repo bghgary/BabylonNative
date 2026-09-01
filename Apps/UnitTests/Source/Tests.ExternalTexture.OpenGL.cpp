@@ -164,6 +164,28 @@ TEST(ExternalTextureOpenGL, ShaderCompilerRejectsAmbiguousSamplerName)
     EXPECT_THROW(CompileFragment(fragmentShader), std::runtime_error);
 }
 
+TEST(ExternalTextureOpenGL, ShaderCompilerRejectsAmbiguousNon2DSamplerName)
+{
+    constexpr std::string_view fragmentShader{R"(
+        #version 300 es
+        #extension GL_OES_EGL_image_external_essl3 : require
+        precision highp float;
+        uniform samplerExternalOES tex;
+        uniform samplerCube cube;
+        out vec4 color;
+        vec4 sampleCube(samplerCube tex)
+        {
+            return texture(tex, vec3(0.0));
+        }
+        void main()
+        {
+            color = texture(tex, vec2(0.0)) + sampleCube(cube);
+        }
+    )"};
+
+    EXPECT_THROW(CompileFragment(fragmentShader), std::runtime_error);
+}
+
 TEST(ExternalTextureOpenGL, ShaderCompilerRejectsVertexExternalSampler)
 {
     constexpr std::string_view vertexShader{R"(

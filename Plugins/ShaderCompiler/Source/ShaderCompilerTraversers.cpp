@@ -126,7 +126,7 @@ namespace Babylon::ShaderCompilerTraversers
                     if (ordinaryNames.contains(name))
                     {
                         throw std::runtime_error{
-                            "ShaderCompiler: samplerExternalOES declaration conflicts with sampler2D declaration named '" + name + "'"};
+                            "ShaderCompiler: samplerExternalOES declaration conflicts with another sampler declaration named '" + name + "'"};
                     }
                 }
 
@@ -144,8 +144,7 @@ namespace Babylon::ShaderCompilerTraversers
             {
                 const auto& type = symbol->getType();
                 if (type.getBasicType() != EbtSampler ||
-                    !type.getSampler().isCombined() ||
-                    type.getSampler().dim != Esd2D)
+                    !type.getSampler().isCombined())
                 {
                     return;
                 }
