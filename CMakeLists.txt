@@ -114,7 +114,22 @@ set(CMAKE_REQUIRED_QUIET TRUE)
 # --------------------------------------------------
 
 # General
-option(BABYLON_NATIVE_BUILD_APPS "Build Babylon Native apps." ${PROJECT_IS_TOP_LEVEL})
+option(BABYLON_NATIVE_MINIMAL_BUILD "Default optional Babylon Native components to disabled." OFF)
+
+set(_BABYLON_NATIVE_OPTIONAL_FEATURE_DEFAULT ON)
+set(_BABYLON_NATIVE_BUILD_APPS_DEFAULT ${PROJECT_IS_TOP_LEVEL})
+set(_BABYLON_NATIVE_EMBEDDING_APPLE_DEFAULT OFF)
+if(APPLE)
+    set(_BABYLON_NATIVE_EMBEDDING_APPLE_DEFAULT ON)
+endif()
+
+if(BABYLON_NATIVE_MINIMAL_BUILD)
+    set(_BABYLON_NATIVE_OPTIONAL_FEATURE_DEFAULT OFF)
+    set(_BABYLON_NATIVE_BUILD_APPS_DEFAULT OFF)
+    set(_BABYLON_NATIVE_EMBEDDING_APPLE_DEFAULT OFF)
+endif()
+
+option(BABYLON_NATIVE_BUILD_APPS "Build Babylon Native apps." ${_BABYLON_NATIVE_BUILD_APPS_DEFAULT})
 option(BABYLON_NATIVE_INSTALL "Include the install target." ${PROJECT_IS_TOP_LEVEL})
 option(BABYLON_DEBUG_TRACE "Enable debug trace." OFF)
 
@@ -122,44 +137,44 @@ option(BABYLON_DEBUG_TRACE "Enable debug trace." OFF)
 option(BABYLON_NATIVE_CHECK_THREAD_AFFINITY "Checks thread safety in the graphics device calls. It can be removed if hosting application ensures thread coherence." ON)
 
 # Plugins
-option(BABYLON_NATIVE_PLUGIN_EXTERNALTEXTURE "Include Babylon Native Plugin ExternalTexture." ON)
-option(BABYLON_NATIVE_PLUGIN_NATIVECAMERA "Include Babylon Native Plugin NativeCamera." ON)
-option(BABYLON_NATIVE_PLUGIN_NATIVECAPTURE "Include Babylon Native Plugin NativeCapture." ON)
+option(BABYLON_NATIVE_PLUGIN_EXTERNALTEXTURE "Include Babylon Native Plugin ExternalTexture." ${_BABYLON_NATIVE_OPTIONAL_FEATURE_DEFAULT})
+option(BABYLON_NATIVE_PLUGIN_NATIVECAMERA "Include Babylon Native Plugin NativeCamera." ${_BABYLON_NATIVE_OPTIONAL_FEATURE_DEFAULT})
+option(BABYLON_NATIVE_PLUGIN_NATIVECAPTURE "Include Babylon Native Plugin NativeCapture." ${_BABYLON_NATIVE_OPTIONAL_FEATURE_DEFAULT})
 option(BABYLON_NATIVE_PLUGIN_NATIVEDRACO "Include Babylon Native Plugin NativeDraco." OFF)
-option(BABYLON_NATIVE_PLUGIN_NATIVEENCODING "Include Babylon Native Plugin NativeEncoding." ON)
-option(BABYLON_NATIVE_PLUGIN_NATIVEENGINE "Include Babylon Native Plugin NativeEngine." ON)
-option(BABYLON_NATIVE_PLUGIN_NATIVEENGINE_WEBP "Enable WebP image parsing in NativeEngine (via bimg)." ON)
-option(BABYLON_NATIVE_PLUGIN_NATIVEENGINE_LOAD_IMAGES "Enable image loading in NativeEngine (LoadTexture, image bitmap, bimg)." ON)
+option(BABYLON_NATIVE_PLUGIN_NATIVEENCODING "Include Babylon Native Plugin NativeEncoding." ${_BABYLON_NATIVE_OPTIONAL_FEATURE_DEFAULT})
+option(BABYLON_NATIVE_PLUGIN_NATIVEENGINE "Include Babylon Native Plugin NativeEngine." ${_BABYLON_NATIVE_OPTIONAL_FEATURE_DEFAULT})
+option(BABYLON_NATIVE_PLUGIN_NATIVEENGINE_WEBP "Enable WebP image parsing in NativeEngine (via bimg)." ${_BABYLON_NATIVE_OPTIONAL_FEATURE_DEFAULT})
+option(BABYLON_NATIVE_PLUGIN_NATIVEENGINE_LOAD_IMAGES "Enable image loading in NativeEngine (LoadTexture, image bitmap, bimg)." ${_BABYLON_NATIVE_OPTIONAL_FEATURE_DEFAULT})
 if(NOT BABYLON_NATIVE_PLUGIN_NATIVEENGINE_LOAD_IMAGES)
     # WebP support relies on image loading code paths; force it off when image loading is disabled.
     set(BABYLON_NATIVE_PLUGIN_NATIVEENGINE_WEBP OFF CACHE BOOL "Enable WebP image parsing in NativeEngine (via bimg)." FORCE)
 endif()
-option(BABYLON_NATIVE_PLUGIN_NATIVEENGINE_COMPILESHADERS "Include Babylon Native Plugin NativeEngine - Compile Shaders." ON)
-option(BABYLON_NATIVE_PLUGIN_NATIVEINPUT "Include Babylon Native Plugin NativeInput." ON)
+option(BABYLON_NATIVE_PLUGIN_NATIVEENGINE_COMPILESHADERS "Include Babylon Native Plugin NativeEngine - Compile Shaders." ${_BABYLON_NATIVE_OPTIONAL_FEATURE_DEFAULT})
+option(BABYLON_NATIVE_PLUGIN_NATIVEINPUT "Include Babylon Native Plugin NativeInput." ${_BABYLON_NATIVE_OPTIONAL_FEATURE_DEFAULT})
 option(BABYLON_NATIVE_PLUGIN_NATIVEMESHOPT "Include Babylon Native Plugin NativeMeshopt." OFF)
-option(BABYLON_NATIVE_PLUGIN_NATIVEOPTIMIZATIONS "Include Babylon Native Plugin NativeOptimizations." ON)
-option(BABYLON_NATIVE_PLUGIN_NATIVETRACING "Include Babylon Native Plugin NativeTracing." ON)
-option(BABYLON_NATIVE_PLUGIN_NATIVEXR "Include Babylon Native Plugin XR." ON)
-option(BABYLON_NATIVE_PLUGIN_SHADERCACHE "Include Babylon Native Plugin ShaderCache." ON)
-option(BABYLON_NATIVE_PLUGIN_SHADERCOMPILER "Include Babylon Native Plugin ShaderCompiler." ON)
-option(BABYLON_NATIVE_PLUGIN_SHADERTOOL "Include Babylon Native Plugin ShaderTool." ON)
-option(BABYLON_NATIVE_PLUGIN_TESTUTILS "Include Babylon Native Plugin TestUtils." ON)
+option(BABYLON_NATIVE_PLUGIN_NATIVEOPTIMIZATIONS "Include Babylon Native Plugin NativeOptimizations." ${_BABYLON_NATIVE_OPTIONAL_FEATURE_DEFAULT})
+option(BABYLON_NATIVE_PLUGIN_NATIVETRACING "Include Babylon Native Plugin NativeTracing." ${_BABYLON_NATIVE_OPTIONAL_FEATURE_DEFAULT})
+option(BABYLON_NATIVE_PLUGIN_NATIVEXR "Include Babylon Native Plugin XR." ${_BABYLON_NATIVE_OPTIONAL_FEATURE_DEFAULT})
+option(BABYLON_NATIVE_PLUGIN_SHADERCACHE "Include Babylon Native Plugin ShaderCache." ${_BABYLON_NATIVE_OPTIONAL_FEATURE_DEFAULT})
+option(BABYLON_NATIVE_PLUGIN_SHADERCOMPILER "Include Babylon Native Plugin ShaderCompiler." ${_BABYLON_NATIVE_OPTIONAL_FEATURE_DEFAULT})
+option(BABYLON_NATIVE_PLUGIN_SHADERTOOL "Include Babylon Native Plugin ShaderTool." ${_BABYLON_NATIVE_OPTIONAL_FEATURE_DEFAULT})
+option(BABYLON_NATIVE_PLUGIN_TESTUTILS "Include Babylon Native Plugin TestUtils." ${_BABYLON_NATIVE_OPTIONAL_FEATURE_DEFAULT})
 
 # Polyfills
-option(BABYLON_NATIVE_POLYFILL_ABORTCONTROLLER "Include Babylon Native Polyfill AbortController." ON)
-option(BABYLON_NATIVE_POLYFILL_CANVAS "Include Babylon Native Polyfill Canvas." ON)
-option(BABYLON_NATIVE_POLYFILL_SCHEDULING "Include Babylon Native Polyfill Scheduling." ON)
-option(BABYLON_NATIVE_POLYFILL_URL "Include Babylon Native Polyfill URL." ON)
-option(BABYLON_NATIVE_POLYFILL_WEBSOCKET "Include Babylon Native Polyfill WebSocket." ON)
-option(BABYLON_NATIVE_POLYFILL_WINDOW "Include Babylon Native Polyfill Window." ON)
+option(BABYLON_NATIVE_POLYFILL_ABORTCONTROLLER "Include Babylon Native Polyfill AbortController." ${_BABYLON_NATIVE_OPTIONAL_FEATURE_DEFAULT})
+option(BABYLON_NATIVE_POLYFILL_CANVAS "Include Babylon Native Polyfill Canvas." ${_BABYLON_NATIVE_OPTIONAL_FEATURE_DEFAULT})
+option(BABYLON_NATIVE_POLYFILL_SCHEDULING "Include Babylon Native Polyfill Scheduling." ${_BABYLON_NATIVE_OPTIONAL_FEATURE_DEFAULT})
+option(BABYLON_NATIVE_POLYFILL_URL "Include Babylon Native Polyfill URL." ${_BABYLON_NATIVE_OPTIONAL_FEATURE_DEFAULT})
+option(BABYLON_NATIVE_POLYFILL_WEBSOCKET "Include Babylon Native Polyfill WebSocket." ${_BABYLON_NATIVE_OPTIONAL_FEATURE_DEFAULT})
+option(BABYLON_NATIVE_POLYFILL_WINDOW "Include Babylon Native Polyfill Window." ${_BABYLON_NATIVE_OPTIONAL_FEATURE_DEFAULT})
 
 # Embedding
-option(BABYLON_NATIVE_EMBEDDING "Build the cross-platform Babylon::Embedding facade (Runtime + View)." ON)
+option(BABYLON_NATIVE_EMBEDDING "Build the cross-platform Babylon::Embedding facade (Runtime + View)." ${_BABYLON_NATIVE_OPTIONAL_FEATURE_DEFAULT})
 option(BABYLON_NATIVE_EMBEDDING_ANDROID "Build the Android JNI interop layer for Babylon::Embedding." OFF)
 # Default ON for Apple platforms — the iOS Playground (and future
 # macOS / visionOS Playground migrations) consume it directly. Apple
 # hosts that don't want the interop layer can explicitly disable.
-option(BABYLON_NATIVE_EMBEDDING_APPLE "Build the Apple (iOS / macOS / visionOS) Obj-C++ interop layer for Babylon::Embedding." ${APPLE})
+option(BABYLON_NATIVE_EMBEDDING_APPLE "Build the Apple (iOS / macOS / visionOS) Obj-C++ interop layer for Babylon::Embedding." ${_BABYLON_NATIVE_EMBEDDING_APPLE_DEFAULT})
 
 # Sanitizers
 option(ENABLE_SANITIZERS "Enable AddressSanitizer and UBSan" OFF)

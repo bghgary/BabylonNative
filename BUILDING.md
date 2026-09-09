@@ -358,3 +358,63 @@ If no `GRAPHICS_API` is provided, the build will use the default.
 
 - For Apple devices, Metal is the only possible choice.
 - Vulkan and D3D12 are under development and might not be stable enough for production purposes.
+
+## Selecting Optional Components
+
+Babylon Native keeps its established feature-enabled defaults unless a consuming build opts into the minimal profile:
+
+```
+cmake -B build/minimal -D BABYLON_NATIVE_MINIMAL_BUILD=ON
+```
+
+Use a fresh build directory when changing profiles so previous CMake cache selections are not reused. The minimal profile defaults applications, the Embedding facade, optional plugins, and optional polyfills to `OFF`; it still builds the core JavaScript runtime and graphics libraries. An explicitly supplied component option overrides the profile, for example:
+
+```
+cmake -B build/minimal-with-rendering -D BABYLON_NATIVE_MINIMAL_BUILD=ON -D BABYLON_NATIVE_PLUGIN_NATIVEENGINE=ON -D BABYLON_NATIVE_PLUGIN_NATIVEENGINE_LOAD_IMAGES=ON -D BABYLON_NATIVE_PLUGIN_NATIVEENGINE_COMPILESHADERS=ON -D BABYLON_NATIVE_PLUGIN_SHADERCOMPILER=ON
+```
+
+The following options select optional components:
+
+| Capability | CMake option | Notes |
+|---|---|---|
+| Repository applications and tests | `BABYLON_NATIVE_BUILD_APPS` | Required to build Playground, UnitTests, and ModuleLoadTest. |
+| Cross-platform Embedding facade | `BABYLON_NATIVE_EMBEDDING` | Provides `Babylon::Embedding::Runtime` and `View`. |
+| Android Embedding interop | `BABYLON_NATIVE_EMBEDDING_ANDROID` | Requires `BABYLON_NATIVE_EMBEDDING`. |
+| Apple Embedding interop | `BABYLON_NATIVE_EMBEDDING_APPLE` | Requires `BABYLON_NATIVE_EMBEDDING`; supported on Apple platforms. |
+| External textures | `BABYLON_NATIVE_PLUGIN_EXTERNALTEXTURE` | Enables native texture handles supplied by a host. |
+| Native camera | `BABYLON_NATIVE_PLUGIN_NATIVECAMERA` | Enables native camera input. |
+| Native frame capture | `BABYLON_NATIVE_PLUGIN_NATIVECAPTURE` | Enables native capture APIs. |
+| Draco compression | `BABYLON_NATIVE_PLUGIN_NATIVEDRACO` | Remains disabled by default in both profiles. |
+| Native encoding | `BABYLON_NATIVE_PLUGIN_NATIVEENCODING` | Enables native text and binary encoding helpers. |
+| Native rendering engine | `BABYLON_NATIVE_PLUGIN_NATIVEENGINE` | Enables Babylon.js rendering through the native graphics device. |
+| NativeEngine image loading | `BABYLON_NATIVE_PLUGIN_NATIVEENGINE_LOAD_IMAGES` | Requires NativeEngine. |
+| NativeEngine WebP decoding | `BABYLON_NATIVE_PLUGIN_NATIVEENGINE_WEBP` | Requires NativeEngine image loading. |
+| NativeEngine runtime shader compilation | `BABYLON_NATIVE_PLUGIN_NATIVEENGINE_COMPILESHADERS` | Requires `BABYLON_NATIVE_PLUGIN_SHADERCOMPILER`. |
+| Native input | `BABYLON_NATIVE_PLUGIN_NATIVEINPUT` | Enables host pointer input. |
+| Meshopt decompression | `BABYLON_NATIVE_PLUGIN_NATIVEMESHOPT` | Remains disabled by default in both profiles. |
+| Native optimizations | `BABYLON_NATIVE_PLUGIN_NATIVEOPTIMIZATIONS` | Enables optimized native replacements for selected Babylon.js operations. |
+| Native tracing | `BABYLON_NATIVE_PLUGIN_NATIVETRACING` | Enables JavaScript-accessible tracing. |
+| Native XR | `BABYLON_NATIVE_PLUGIN_NATIVEXR` | Built only for Android and iOS. |
+| Shader cache | `BABYLON_NATIVE_PLUGIN_SHADERCACHE` | Enables precompiled shader lookup. |
+| Shader compiler | `BABYLON_NATIVE_PLUGIN_SHADERCOMPILER` | Enables native shader compilation. |
+| Shader tool | `BABYLON_NATIVE_PLUGIN_SHADERTOOL` | Requires both ShaderCache and ShaderCompiler. |
+| Test utilities | `BABYLON_NATIVE_PLUGIN_TESTUTILS` | Required by Playground validation tests. |
+| AbortController | `BABYLON_NATIVE_POLYFILL_ABORTCONTROLLER` | Enables the AbortController polyfill. |
+| Canvas | `BABYLON_NATIVE_POLYFILL_CANVAS` | Enables the Canvas polyfill. |
+| Scheduling | `BABYLON_NATIVE_POLYFILL_SCHEDULING` | Enables scheduling polyfills. |
+| URL | `BABYLON_NATIVE_POLYFILL_URL` | Enables the URL polyfill. |
+| WebSocket | `BABYLON_NATIVE_POLYFILL_WEBSOCKET` | Enables the WebSocket polyfill. |
+| Window | `BABYLON_NATIVE_POLYFILL_WINDOW` | Enables the Window polyfill. |
+
+The minimal profile intentionally does not create the application test targets. Their absence is expected, not a regression. If applications are explicitly enabled under the minimal profile, their optional dependencies must also be enabled:
+
+| Target | Required optional components |
+|---|---|
+| Playground | Embedding, NativeInput, and TestUtils to compile the host; the complete validation suite also expects the established plugin and polyfill set. |
+| UnitTests | Canvas, ExternalTexture, NativeEncoding, NativeEngine, NativeEngine image loading and shader compilation, ShaderCache, ShaderCompiler, and Window. Draco and Meshopt tests run only when their plugins are enabled. |
+| ModuleLoadTest | Canvas, ExternalTexture, NativeEncoding, NativeEngine, and Window. |
+| HeadlessScreenshotApp | ExternalTexture, NativeEngine, and Window. |
+| StyleTransferApp | ExternalTexture, NativeEngine, NativeInput, and Window. |
+| PrecompiledShaderTest | ExternalTexture, NativeEngine, ShaderCache, ShaderCompiler, ShaderTool, and Window, with NativeEngine runtime shader compilation disabled. |
+
+Missing-target build errors and JavaScript failures caused by omitting these components are expected profile-selection failures. Run the repository's full test suite without the minimal profile, or explicitly enable every component needed by the selected test target; failures after those dependencies are enabled are regressions.
