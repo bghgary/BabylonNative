@@ -114,7 +114,7 @@ set(CMAKE_REQUIRED_QUIET TRUE)
 # --------------------------------------------------
 
 # General
-option(BABYLON_NATIVE_MINIMAL_BUILD "Default optional Babylon Native components to disabled." OFF)
+option(BABYLON_NATIVE_MINIMAL_BUILD "Disable optional Babylon Native components by default." OFF)
 
 set(_BABYLON_NATIVE_OPTIONAL_FEATURE_DEFAULT ON)
 set(_BABYLON_NATIVE_BUILD_APPS_DEFAULT ${PROJECT_IS_TOP_LEVEL})
