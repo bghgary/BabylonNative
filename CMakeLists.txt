@@ -137,6 +137,7 @@ option(BABYLON_NATIVE_CHECK_THREAD_AFFINITY "Checks thread safety in the graphic
 option(BABYLON_NATIVE_PLUGIN_EXTERNALTEXTURE "Include Babylon Native Plugin ExternalTexture." ${_BABYLON_NATIVE_OPTIONAL_FEATURE_DEFAULT})
 option(BABYLON_NATIVE_PLUGIN_NATIVECAMERA "Include Babylon Native Plugin NativeCamera." ${_BABYLON_NATIVE_OPTIONAL_FEATURE_DEFAULT})
 option(BABYLON_NATIVE_PLUGIN_NATIVECAPTURE "Include Babylon Native Plugin NativeCapture." ${_BABYLON_NATIVE_OPTIONAL_FEATURE_DEFAULT})
+# Use _BABYLON_NATIVE_OPTIONAL_FEATURE_DEFAULT once NativeDraco is ready to be enabled by default.
 option(BABYLON_NATIVE_PLUGIN_NATIVEDRACO "Include Babylon Native Plugin NativeDraco." OFF)
 option(BABYLON_NATIVE_PLUGIN_NATIVEENCODING "Include Babylon Native Plugin NativeEncoding." ${_BABYLON_NATIVE_OPTIONAL_FEATURE_DEFAULT})
 option(BABYLON_NATIVE_PLUGIN_NATIVEENGINE "Include Babylon Native Plugin NativeEngine." ${_BABYLON_NATIVE_OPTIONAL_FEATURE_DEFAULT})
