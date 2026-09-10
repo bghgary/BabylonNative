@@ -408,15 +408,4 @@ The following options select optional components:
 | WebSocket | `BABYLON_NATIVE_POLYFILL_WEBSOCKET` | Enables the WebSocket polyfill. |
 | Window | `BABYLON_NATIVE_POLYFILL_WINDOW` | Enables the Window polyfill. |
 
-The minimal profile does not create application or test targets unless `BABYLON_NATIVE_BUILD_APPS` is enabled explicitly. Each selected target also requires its optional dependencies:
-
-| Target | Required optional components |
-|---|---|
-| Playground | Embedding, NativeInput, and TestUtils to compile the host; the complete validation suite also requires every plugin and polyfill enabled by the default configuration. |
-| UnitTests | Canvas, ExternalTexture, NativeEncoding, NativeEngine, NativeEngine image loading and shader compilation, ShaderCache, ShaderCompiler, and Window. Draco and Meshopt tests run only when their plugins are enabled. |
-| ModuleLoadTest | Canvas, ExternalTexture, NativeEncoding, NativeEngine, and Window. |
-| HeadlessScreenshotApp | ExternalTexture, NativeEngine, and Window. |
-| StyleTransferApp | ExternalTexture, NativeEngine, NativeInput, and Window. |
-| PrecompiledShaderTest | ExternalTexture, NativeEngine, ShaderCache, ShaderCompiler, ShaderTool, and Window, with NativeEngine runtime shader compilation disabled. |
-
-Missing-target build errors and JavaScript failures caused by an omitted dependency indicate an incomplete component selection. To check for regressions, run the full test suite with the default configuration or explicitly enable every component required by the selected test target.
+The repository applications and tests exercise optional components and are not included in the minimal profile. Use the default configuration to build and run the complete test suite.
