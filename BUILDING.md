@@ -369,7 +369,7 @@ To build only the core JavaScript runtime and graphics libraries, enable the min
 cmake -B build/minimal -D BABYLON_NATIVE_MINIMAL_BUILD=ON
 ```
 
-The profile prevents newly added optional components from increasing the build unless explicitly selected. It sets the initial values for applications, the Embedding facade, optional plugins, and optional polyfills to `OFF`. An explicitly supplied component option takes precedence, for example:
+The profile sets the initial values for applications, the Embedding facade, optional plugins, and optional polyfills to `OFF`. Embedders opt in to the components they need, and newly added components remain excluded until selected:
 
 ```
 cmake -B build/minimal-with-rendering -D BABYLON_NATIVE_MINIMAL_BUILD=ON -D BABYLON_NATIVE_PLUGIN_NATIVEENGINE=ON -D BABYLON_NATIVE_PLUGIN_NATIVEENGINE_LOAD_IMAGES=ON -D BABYLON_NATIVE_PLUGIN_NATIVEENGINE_COMPILESHADERS=ON -D BABYLON_NATIVE_PLUGIN_SHADERCOMPILER=ON
