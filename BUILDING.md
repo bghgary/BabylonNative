@@ -361,13 +361,15 @@ If no `GRAPHICS_API` is provided, the build will use the default.
 
 ## Selecting Optional Components
 
-Babylon Native keeps its established feature-enabled defaults unless a consuming build opts into the minimal profile:
+By default, a top-level Babylon Native build includes the repository applications, the Embedding facade, and most plugins and polyfills. NativeDraco and NativeMeshopt are disabled unless enabled explicitly.
+
+To build only the core JavaScript runtime and graphics libraries, enable the minimal build profile:
 
 ```
 cmake -B build/minimal -D BABYLON_NATIVE_MINIMAL_BUILD=ON
 ```
 
-Use a fresh build directory when changing profiles so previous CMake cache selections are not reused. The minimal profile defaults applications, the Embedding facade, optional plugins, and optional polyfills to `OFF`; it still builds the core JavaScript runtime and graphics libraries. An explicitly supplied component option overrides the profile, for example:
+Use a fresh build directory when changing profiles so previous CMake cache selections are not reused. The minimal profile sets the initial values for applications, the Embedding facade, optional plugins, and optional polyfills to `OFF`. An explicitly supplied component option takes precedence, for example:
 
 ```
 cmake -B build/minimal-with-rendering -D BABYLON_NATIVE_MINIMAL_BUILD=ON -D BABYLON_NATIVE_PLUGIN_NATIVEENGINE=ON -D BABYLON_NATIVE_PLUGIN_NATIVEENGINE_LOAD_IMAGES=ON -D BABYLON_NATIVE_PLUGIN_NATIVEENGINE_COMPILESHADERS=ON -D BABYLON_NATIVE_PLUGIN_SHADERCOMPILER=ON
@@ -384,14 +386,14 @@ The following options select optional components:
 | External textures | `BABYLON_NATIVE_PLUGIN_EXTERNALTEXTURE` | Enables native texture handles supplied by a host. |
 | Native camera | `BABYLON_NATIVE_PLUGIN_NATIVECAMERA` | Enables native camera input. |
 | Native frame capture | `BABYLON_NATIVE_PLUGIN_NATIVECAPTURE` | Enables native capture APIs. |
-| Draco compression | `BABYLON_NATIVE_PLUGIN_NATIVEDRACO` | Remains disabled by default in both profiles. |
+| Draco compression | `BABYLON_NATIVE_PLUGIN_NATIVEDRACO` | Disabled by default; enable explicitly when needed. |
 | Native encoding | `BABYLON_NATIVE_PLUGIN_NATIVEENCODING` | Enables native text and binary encoding helpers. |
 | Native rendering engine | `BABYLON_NATIVE_PLUGIN_NATIVEENGINE` | Enables Babylon.js rendering through the native graphics device. |
 | NativeEngine image loading | `BABYLON_NATIVE_PLUGIN_NATIVEENGINE_LOAD_IMAGES` | Requires NativeEngine. |
 | NativeEngine WebP decoding | `BABYLON_NATIVE_PLUGIN_NATIVEENGINE_WEBP` | Requires NativeEngine image loading. |
 | NativeEngine runtime shader compilation | `BABYLON_NATIVE_PLUGIN_NATIVEENGINE_COMPILESHADERS` | Requires `BABYLON_NATIVE_PLUGIN_SHADERCOMPILER`. |
 | Native input | `BABYLON_NATIVE_PLUGIN_NATIVEINPUT` | Enables host pointer input. |
-| Meshopt decompression | `BABYLON_NATIVE_PLUGIN_NATIVEMESHOPT` | Remains disabled by default in both profiles. |
+| Meshopt decompression | `BABYLON_NATIVE_PLUGIN_NATIVEMESHOPT` | Disabled by default; enable explicitly when needed. |
 | Native optimizations | `BABYLON_NATIVE_PLUGIN_NATIVEOPTIMIZATIONS` | Enables optimized native replacements for selected Babylon.js operations. |
 | Native tracing | `BABYLON_NATIVE_PLUGIN_NATIVETRACING` | Enables JavaScript-accessible tracing. |
 | Native XR | `BABYLON_NATIVE_PLUGIN_NATIVEXR` | Built only for Android and iOS. |
@@ -406,15 +408,15 @@ The following options select optional components:
 | WebSocket | `BABYLON_NATIVE_POLYFILL_WEBSOCKET` | Enables the WebSocket polyfill. |
 | Window | `BABYLON_NATIVE_POLYFILL_WINDOW` | Enables the Window polyfill. |
 
-The minimal profile intentionally does not create the application test targets. Their absence is expected, not a regression. If applications are explicitly enabled under the minimal profile, their optional dependencies must also be enabled:
+The minimal profile does not create application or test targets unless `BABYLON_NATIVE_BUILD_APPS` is enabled explicitly. Each selected target also requires its optional dependencies:
 
 | Target | Required optional components |
 |---|---|
-| Playground | Embedding, NativeInput, and TestUtils to compile the host; the complete validation suite also expects the established plugin and polyfill set. |
+| Playground | Embedding, NativeInput, and TestUtils to compile the host; the complete validation suite also requires every plugin and polyfill enabled by the default configuration. |
 | UnitTests | Canvas, ExternalTexture, NativeEncoding, NativeEngine, NativeEngine image loading and shader compilation, ShaderCache, ShaderCompiler, and Window. Draco and Meshopt tests run only when their plugins are enabled. |
 | ModuleLoadTest | Canvas, ExternalTexture, NativeEncoding, NativeEngine, and Window. |
 | HeadlessScreenshotApp | ExternalTexture, NativeEngine, and Window. |
 | StyleTransferApp | ExternalTexture, NativeEngine, NativeInput, and Window. |
 | PrecompiledShaderTest | ExternalTexture, NativeEngine, ShaderCache, ShaderCompiler, ShaderTool, and Window, with NativeEngine runtime shader compilation disabled. |
 
-Missing-target build errors and JavaScript failures caused by omitting these components are expected profile-selection failures. Run the repository's full test suite without the minimal profile, or explicitly enable every component needed by the selected test target; failures after those dependencies are enabled are regressions.
+Missing-target build errors and JavaScript failures caused by an omitted dependency indicate an incomplete component selection. To check for regressions, run the full test suite with the default configuration or explicitly enable every component required by the selected test target.
