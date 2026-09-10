@@ -361,7 +361,7 @@ If no `GRAPHICS_API` is provided, the build will use the default.
 
 ## Selecting Optional Components
 
-By default, a top-level Babylon Native build includes the repository applications, the Embedding facade, and most plugins and polyfills. NativeDraco and NativeMeshopt are disabled unless enabled explicitly.
+By default, a top-level Babylon Native build includes the repository applications, the Embedding facade, and most plugins and polyfills.
 
 To build only the core JavaScript runtime and graphics libraries, enable the minimal build profile:
 
@@ -386,14 +386,14 @@ The following options select optional components:
 | External textures | `BABYLON_NATIVE_PLUGIN_EXTERNALTEXTURE` | Enables native texture handles supplied by a host. |
 | Native camera | `BABYLON_NATIVE_PLUGIN_NATIVECAMERA` | Enables native camera input. |
 | Native frame capture | `BABYLON_NATIVE_PLUGIN_NATIVECAPTURE` | Enables native capture APIs. |
-| Draco compression | `BABYLON_NATIVE_PLUGIN_NATIVEDRACO` | Disabled by default; enable explicitly when needed. |
+| Draco compression | `BABYLON_NATIVE_PLUGIN_NATIVEDRACO` | Enables native Draco decompression. |
 | Native encoding | `BABYLON_NATIVE_PLUGIN_NATIVEENCODING` | Enables native text and binary encoding helpers. |
 | Native rendering engine | `BABYLON_NATIVE_PLUGIN_NATIVEENGINE` | Enables Babylon.js rendering through the native graphics device. |
 | NativeEngine image loading | `BABYLON_NATIVE_PLUGIN_NATIVEENGINE_LOAD_IMAGES` | Requires NativeEngine. |
 | NativeEngine WebP decoding | `BABYLON_NATIVE_PLUGIN_NATIVEENGINE_WEBP` | Requires NativeEngine image loading. |
 | NativeEngine runtime shader compilation | `BABYLON_NATIVE_PLUGIN_NATIVEENGINE_COMPILESHADERS` | Requires `BABYLON_NATIVE_PLUGIN_SHADERCOMPILER`. |
 | Native input | `BABYLON_NATIVE_PLUGIN_NATIVEINPUT` | Enables host pointer input. |
-| Meshopt decompression | `BABYLON_NATIVE_PLUGIN_NATIVEMESHOPT` | Disabled by default; enable explicitly when needed. |
+| Meshopt decompression | `BABYLON_NATIVE_PLUGIN_NATIVEMESHOPT` | Enables native Meshopt decompression. |
 | Native optimizations | `BABYLON_NATIVE_PLUGIN_NATIVEOPTIMIZATIONS` | Enables optimized native replacements for selected Babylon.js operations. |
 | Native tracing | `BABYLON_NATIVE_PLUGIN_NATIVETRACING` | Enables JavaScript-accessible tracing. |
 | Native XR | `BABYLON_NATIVE_PLUGIN_NATIVEXR` | Built only for Android and iOS. |
