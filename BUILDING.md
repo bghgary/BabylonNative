@@ -363,15 +363,13 @@ If no `GRAPHICS_API` is provided, the build will use the default.
 
 By default, a top-level Babylon Native build includes the repository applications, the Embedding facade, and most plugins and polyfills.
 
-Embedders that need only the core JavaScript runtime and graphics libraries would otherwise need to disable each unrelated component individually. The minimal profile also prevents newly added optional components from increasing such builds unless explicitly selected.
-
-To build only the core JavaScript runtime and graphics libraries, enable the minimal build profile:
+To build only the core JavaScript runtime and graphics libraries, enable the minimal profile instead of disabling each unrelated component individually:
 
 ```
 cmake -B build/minimal -D BABYLON_NATIVE_MINIMAL_BUILD=ON
 ```
 
-The minimal profile sets the initial values for applications, the Embedding facade, optional plugins, and optional polyfills to `OFF`. An explicitly supplied component option takes precedence, for example:
+The profile also prevents newly added optional components from increasing the build unless explicitly selected. It sets the initial values for applications, the Embedding facade, optional plugins, and optional polyfills to `OFF`. An explicitly supplied component option takes precedence, for example:
 
 ```
 cmake -B build/minimal-with-rendering -D BABYLON_NATIVE_MINIMAL_BUILD=ON -D BABYLON_NATIVE_PLUGIN_NATIVEENGINE=ON -D BABYLON_NATIVE_PLUGIN_NATIVEENGINE_LOAD_IMAGES=ON -D BABYLON_NATIVE_PLUGIN_NATIVEENGINE_COMPILESHADERS=ON -D BABYLON_NATIVE_PLUGIN_SHADERCOMPILER=ON
