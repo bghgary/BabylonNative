@@ -1226,20 +1226,7 @@
     }
     function runTest(index, outerDone) {
         const test = config.tests[index];
-        const done = makeTestDone(function (status) {
-            if (typeof opts.onTestResult !== "function") {
-                outerDone(status);
-                return;
-            }
-            Promise.resolve().then(function () {
-                return opts.onTestResult(index, test.title, status);
-            }).then(function () {
-                outerDone(status);
-            }).catch(function (error) {
-                console.error("Validation result delivery failed: " + error);
-                TestUtils.exit(1);
-            });
-        }, test);
+        const done = makeTestDone(outerDone, test);
         appliedWorkarounds = [];
         if (index >= config.tests.length) {
             done(false);
@@ -1252,7 +1239,7 @@
 
         try {
             const useLargeWorldRendering = !!test.useLargeWorldRendering;
-            if (!engine || opts.freshEngine || !!engine.getCreationOptions().useLargeWorldRendering !== useLargeWorldRendering) {
+            if (!engine || !!engine.getCreationOptions().useLargeWorldRendering !== useLargeWorldRendering) {
                 if (engine) {
                     engine.dispose();
                     engine = undefined;
@@ -1444,7 +1431,7 @@
                     return;
                 }
                 const currentTitle = config.tests[i].title || "(unnamed)";
-                const executeTest = function () { runTest(i, function (status) {
+                runTest(i, function (status) {
                     ranCount++;
                     if (!status) {
                         failedCount++;
@@ -1471,17 +1458,7 @@
                     // Defer next iteration to avoid blowing Chakra's
                     // recursion stack on long test lists.
                     setTimeout(function () { recursiveRunTest(i); }, 0);
-                }); };
-                if (typeof opts.onTestStart === "function") {
-                    Promise.resolve().then(function () {
-                        return opts.onTestStart(i, currentTitle);
-                    }).then(executeTest).catch(function (error) {
-                        console.error("Validation start delivery failed: " + error);
-                        TestUtils.exit(1);
-                    });
-                } else {
-                    executeTest();
-                }
+                });
             }
 
             recursiveRunTest(0);

@@ -87,13 +87,13 @@ function fixture(t, { rejectAllocation = false, rejectRegistration = false, reje
         process: { env: { BROWSERSTACK_LOCAL_BINARY: __filename } }
     }, { filename: "browserstack-fixture.cjs" });
     const options = {
-        controller: { port: 1234, devicePath: "/device/fixture", ready: async () => ({ protocol: 1 }) },
+        controller: { port: 1234, devicePath: "/device/fixture", ready: async () => ({ protocol: 2 }) },
         platform: "android", deviceName: "fixture-device", osVersion: "12.0",
         app: __filename, output,
         auth: { key: "fixture-secret", authorization: "Basic fixture",
             redact: value => String(value).split("fixture-secret").join("[REDACTED]") }
     };
-    return { startSession: module.exports.startSession, options, calls, root, output, console, sink,
+    return { startSession: module.exports.startSession, uploadApp: module.exports.uploadApp, options, calls, root, output, console, sink,
         isRunning: () => running };
 }
 
@@ -200,4 +200,34 @@ test("missing native diagnostics preserve the startup failure and report the dia
         return true;
     });
     assert.equal(f.calls.filter(call => call.endsWith("/logs/fixture.txt")).length, 5);
+});
+
+test("a successful run retains occupancy without waiting for optional native logs", async t => {
+    const f = fixture(t, { nativeLogFailures: 5 });
+    const session = await f.startSession(f.options);
+    await session.stop();
+    await session.diagnostics({ includeNativeLogs: false });
+    assert.equal(session.measurements.deviceSeconds, 7);
+    assert.equal(f.calls.filter(call => call.endsWith("/logs/fixture.txt")).length, 0);
+});
+
+test("replacement workers reuse one exact-package upload", async t => {
+    const f = fixture(t);
+    f.options.uploadedApp = await f.uploadApp(f.options);
+    for (let worker = 0; worker < 2; worker++) {
+        const session = await f.startSession(f.options);
+        assert.equal(session.measurements.uploadShared, true);
+        assert.equal(session.measurements.uploadMs, 0);
+        await session.stop();
+    }
+    assert.equal(f.calls.filter(call => call.endsWith("/upload")).length, 1);
+    assert.equal(f.calls.filter(call => call.startsWith("DELETE ")).length, 2);
+});
+
+test("a shared upload for different bytes is rejected before allocation", async t => {
+    const f = fixture(t);
+    f.options.uploadedApp = { ...await f.uploadApp(f.options), sha256: "not-the-package-hash" };
+    await assert.rejects(f.startSession(f.options), /does not match the exact mobile package/);
+    assert.equal(f.calls.some(call => call.endsWith("/session")), false);
+    assert.equal(f.isRunning(), false);
 });

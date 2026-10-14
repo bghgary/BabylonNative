@@ -7,10 +7,10 @@
   },
   "scripts": {
     "test": "node --test test/*.test.cjs",
-    "visual": "playwright test"
+    "test:shared": "node --test test/shared-suite.cjs",
+    "visual": "node run.cjs"
   },
   "dependencies": {
-    "@playwright/test": "1.57.0",
     "browserstack-local": "1.5.12",
     "fflate": "0.8.3",
     "pngjs": "7.0.0"

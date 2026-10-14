@@ -74,7 +74,7 @@ class MobileController {
         }
         const message = JSON.parse(Buffer.concat(chunks).toString("utf8"));
         if (message.type === "ready") {
-            if (this.device || message.protocol !== 1 || typeof message.babylonVersion !== "string" ||
+            if (this.device || message.protocol !== 2 || typeof message.babylonVersion !== "string" ||
                     typeof message.graphicsApi !== "string") {
                 throw new Error("Invalid or duplicate mobile ready message");
             }
@@ -85,6 +85,15 @@ class MobileController {
                 throw new Error("Result does not match the active mobile command");
             }
             const active = this.active;
+            if (!Array.isArray(message.console) || message.console.length > 50) {
+                throw new Error("Invalid native console batch");
+            }
+            for (const item of message.console) {
+                if (!item || !["log", "warn", "error"].includes(item.level) || typeof item.text !== "string") {
+                    throw new Error("Invalid native console message");
+                }
+                await this.onEvent(item);
+            }
             this.clearActive();
             if (message.error) {
                 const error = new Error(message.error);
@@ -94,20 +103,7 @@ class MobileController {
                 active.resolve(message.value);
             }
         } else {
-            if (!["test-start", "test-result", "frame"].includes(message.type) ||
-                    !this.active || message.commandId !== this.active.id ||
-                    !Number.isSafeInteger(message.index) || message.index < 0) {
-                throw new Error("Invalid mobile validation event");
-            }
-            if (message.type === "test-start") {
-                this.active.currentIndex = message.index;
-            } else if (message.index !== this.active.currentIndex) {
-                throw new Error("Validation event does not match the active scene");
-            }
-            if (message.type !== "frame") {
-                this.armActivityDeadline();
-            }
-            await this.onEvent(message);
+            throw new Error("Unknown native transport message");
         }
         response.end("OK");
     }
@@ -160,7 +156,6 @@ class MobileController {
     timeout() {
         const error = new Error("Mobile command timed out; the app session must be replaced");
         error.name = "MobileCommandTimeout";
-        error.sceneIndex = this.active?.currentIndex;
         this.fail(error);
     }
 

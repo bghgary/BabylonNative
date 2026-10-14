@@ -5,9 +5,7 @@
         throw new Error("Invalid mobile test controller endpoint");
     }
     var stopped = false;
-    var queue = [];
     var consoleMessages = [];
-    var commandId;
     var originalConsole = console.error;
     var crcTable = new Uint32Array(256);
     for (var i = 0; i < 256; ++i) {
@@ -85,14 +83,6 @@
             throw new Error("Mobile controller POST failed: " + response.status);
         }
     }
-    function enqueue(message) {
-        queue.push(message);
-    }
-    async function flush() {
-        while (queue.length) {
-            await post(queue.shift());
-        }
-    }
     ["log", "warn", "error"].forEach(function (level) {
         var original = console[level];
         console[level] = function () {
@@ -105,82 +95,34 @@
             }
         };
     });
-    globalThis.__mobileValidation = {
+    globalThis.__mobilePlaywright = {
         encodePNG: encodePNG,
-        async run(options) {
-            if (!options || !Array.isArray(options.testIndices) || options.testIndices.length === 0 ||
-                    options.testIndices.some(function (n) { return !Number.isInteger(n) || n < 0; })) {
-                throw new Error("Mobile validation requires nonempty explicit test indices");
-            }
-            // Do not construct a Babylon.js engine before catalog matrix precision is selected.
+        viewport: function (requested) {
             var probe = new _native.Engine();
             try {
                 var width = probe.getRenderWidth();
                 var height = probe.getRenderHeight();
-                if (width !== 600 || height !== 400) {
-                    throw new Error("Mobile framebuffer is " + width + "x" + height + ", expected 600x400");
+                if (width !== requested.width || height !== requested.height) {
+                    throw new Error("Mobile framebuffer is " + width + "x" + height +
+                        ", expected " + requested.width + "x" + requested.height);
                 }
             } finally {
                 probe.dispose();
             }
-            var originalTestUtils = globalThis.TestUtils;
-            var remoteTestUtils = {};
-            ["setMSAASamples", "setTitle", "getGraphicsApiName", "decodeImage", "getImageData",
-                "getFrameBufferData", "captureNextFrame"].forEach(function (name) {
-                if (typeof originalTestUtils[name] !== "function") {
-                    throw new Error("Missing native TestUtils method: " + name);
-                }
-                remoteTestUtils[name] = originalTestUtils[name].bind(originalTestUtils);
-            });
-            var previousOptions = globalThis._playgroundOptions;
-            var finish;
-            var completion = new Promise(function (resolve) { finish = resolve; });
-            var currentIndex;
-            remoteTestUtils.exit = function (code) { finish({ exitCode: code }); };
-            remoteTestUtils.updateSize = function (width, height) {
-                if (width !== 600 || height !== 400) {
-                    throw new Error("Mobile validation framebuffer must remain 600x400");
-                }
-            };
-            remoteTestUtils.getOutputDirectory = function () { return "mobile-results"; };
-            remoteTestUtils.writePNG = function (data, width, height, filename) {
-                enqueue({ type: "frame", commandId: commandId, index: currentIndex,
-                    filename: filename, image: encodePNG(data, width, height) });
-            };
-            globalThis.TestUtils = remoteTestUtils;
-            globalThis._playgroundOptions = {
-                testIndices: options.testIndices,
-                freshEngine: true,
-                saveResults: true,
-                onTestStart: async function (index, title) {
-                    currentIndex = index;
-                    consoleMessages.length = 0;
-                    await post({ type: "test-start", commandId: commandId, index: index, title: title });
-                },
-                onTestResult: async function (index, title, passed) {
-                    await flush();
-                    await post({ type: "test-result", commandId: commandId, index: index,
-                        title: title, passed: passed, console: consoleMessages.slice() });
-                }
-            };
-            try {
-                var source = await fetch("app:///Scripts/validation_native.js");
-                if (!source.ok) {
-                    throw new Error("Cannot load packaged validation runner: " + source.status);
-                }
-                (0, eval)(await source.text());
-                var result = await completion;
-                await flush();
-                return result;
-            } finally {
-                globalThis.TestUtils = originalTestUtils;
-                globalThis._playgroundOptions = previousOptions;
+        },
+        screenshot: function () {
+            var capture = globalThis.__babylonNativeScreenshot;
+            if (!capture) {
+                throw new Error("The shared Playwright render step did not capture a native framebuffer");
             }
+            var image = encodePNG(capture.data, capture.width, capture.height);
+            delete globalThis.__babylonNativeScreenshot;
+            return image;
         }
     };
     (async function () {
         try {
-            await post({ type: "ready", protocol: 1, babylonVersion: BABYLON.Engine.Version,
+            await post({ type: "ready", protocol: 2, babylonVersion: BABYLON.Engine.Version,
                 graphicsApi: TestUtils.getGraphicsApiName() });
             while (!stopped) {
                 var response = await fetch(endpoint + "/next");
@@ -194,14 +136,16 @@
                 if (!Number.isSafeInteger(command.id) || typeof command.source !== "string") {
                     throw new Error("Malformed mobile controller command");
                 }
-                commandId = command.id;
+                consoleMessages.length = 0;
                 var started = performance.now();
                 try {
                     var result = await (0, eval)(command.source);
                     await post({ type: "result", id: command.id, value: result,
+                        console: consoleMessages.slice(),
                         deviceMs: performance.now() - started });
                 } catch (error) {
                     await post({ type: "result", id: command.id, error: String(error),
+                        console: consoleMessages.slice(),
                         stack: error.stack || "", deviceMs: performance.now() - started });
                 }
             }

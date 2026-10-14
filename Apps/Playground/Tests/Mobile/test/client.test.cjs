@@ -7,7 +7,7 @@ const { PNG } = require("pngjs");
 const { MobileController } = require("../controller.cjs");
 const { credentials } = require("../browserstack.cjs");
 
-async function device(t, { script, onEvent } = {}) {
+async function device(t, { onEvent } = {}) {
     const controller = await new MobileController(onEvent).listen();
     const endpoint = `http://127.0.0.1:${controller.port}${controller.devicePath}`;
     const cancellation = new AbortController();
@@ -35,9 +35,10 @@ async function device(t, { script, onEvent } = {}) {
             }
         },
         TestUtils: nativeUtils,
-        fetch: (url, options = {}) => url === "app:///Scripts/validation_native.js"
-            ? Promise.resolve({ ok: true, text: async () => script })
-            : fetch(url, { ...options, signal: cancellation.signal }),
+        fetch: (url, options = {}) => {
+            assert.ok(!url.startsWith("app:///"), "The transport must not load a test runner or catalog");
+            return fetch(url, { ...options, signal: cancellation.signal });
+        },
         console: { log() {}, warn() {}, error: text => errors.push(text) },
         performance, TextEncoder, TextDecoder
     });
@@ -70,7 +71,7 @@ test("device PNG export preserves every RGBA byte including alpha", async t => {
         for (let i = 0; i < data.length; ++i) {
             data[i] = i % 251;
         }
-        return __mobileValidation.encodePNG(data, 16, 8);
+        return __mobilePlaywright.encodePNG(data, 16, 8);
     });
     const encoded = Buffer.from(image.png, "base64");
     assert.equal(encoded.length, image.pngBytes);
@@ -86,8 +87,8 @@ test("device PNG export preserves every RGBA byte including alpha", async t => {
 
 test("invalid framebuffer metadata and missing compression are explicit failures", async t => {
     const { controller } = await device(t);
-    await assert.rejects(controller.evaluate(() => __mobileValidation.encodePNG(new Uint8Array(4), 2, 1)), /dimensions or length/);
-    await assert.rejects(controller.evaluate(() => __mobileValidation.encodePNG(new Uint8Array(4), 1, 1)), /compression was not installed/);
+    await assert.rejects(controller.evaluate(() => __mobilePlaywright.encodePNG(new Uint8Array(4), 2, 1)), /dimensions or length/);
+    await assert.rejects(controller.evaluate(() => __mobilePlaywright.encodePNG(new Uint8Array(4), 1, 1)), /compression was not installed/);
 });
 
 test("hardware-scaled export uses native integer dimensions without rejecting larger frames", async t => {
@@ -95,33 +96,21 @@ test("hardware-scaled export uses native integer dimensions without rejecting la
     const root = path.dirname(require.resolve("fflate/package.json"));
     vm.runInContext(fs.readFileSync(path.join(root, "umd", "index.js"), "utf8"), context);
     const image = await controller.evaluate(() =>
-        __mobileValidation.encodePNG(new Uint8Array(666 * 444 * 4), 600 / 0.9, 400 / 0.9));
+        __mobilePlaywright.encodePNG(new Uint8Array(666 * 444 * 4), 600 / 0.9, 400 / 0.9));
     const decoded = PNG.sync.read(Buffer.from(image.png, "base64"), { checkCRC: true });
     assert.equal(decoded.width, 666);
     assert.equal(decoded.height, 444);
     assert.equal(decoded.data.length, 666 * 444 * 4);
 });
 
-test("native validation flushes frame/result before exit and restores read-only native bindings", async t => {
+test("transport forwards console output without replacing native bindings or loading a catalog", async t => {
     const events = [];
-    const { controller, context, nativeUtils } = await device(t, {
-        onEvent: async message => events.push(message),
-        script: `(async function () {
-            await _playgroundOptions.onTestStart(3, "fixture scene");
-            TestUtils.setMSAASamples(0);
-            TestUtils.writePNG(new Uint8Array(4), 1, 1, "mobile-results/Results/frame.png");
-            await _playgroundOptions.onTestResult(3, "fixture scene", false);
-            TestUtils.exit(-1);
-        })();`
-    });
-    const root = path.dirname(require.resolve("fflate/package.json"));
-    vm.runInContext(fs.readFileSync(path.join(root, "umd", "index.js"), "utf8"), context);
-    assert.deepEqual(await controller.evaluate(() => __mobileValidation.run({ testIndices: [3] })), { exitCode: -1 });
-    assert.deepEqual(events.map(event => event.type), ["test-start", "frame", "test-result"]);
-    assert.equal(events[1].index, 3);
-    assert.equal(events[2].passed, false);
+    const { controller, context, nativeUtils } = await device(t, { onEvent: async message => events.push(message) });
+    await controller.evaluate(() => { console.error("fixture scene error"); TestUtils.setMSAASamples(0); });
+    assert.deepEqual(events, [{ level: "error", text: "fixture scene error" }]);
     assert.equal(context.TestUtils, nativeUtils);
     assert.equal(context._playgroundOptions, undefined);
+    assert.equal(context.__mobileValidation, undefined);
 });
 
 test("credential redaction covers literal, URL-encoded and basic-auth forms", () => {
@@ -134,9 +123,9 @@ test("credential redaction covers literal, URL-encoded and basic-auth forms", ()
     assert.equal(auth.redact(unsafe), "[REDACTED] [REDACTED] [REDACTED] [REDACTED]");
 });
 
-test("density-scaled framebuffer fails before starting a catalog scene", async t => {
+test("density-scaled framebuffer fails before initializing a Playwright scene", async t => {
     const { controller, context } = await device(t);
     vm.runInContext("_native.Engine.prototype.getRenderWidth = function () { return 200; };", context);
-    await assert.rejects(controller.evaluate(() => __mobileValidation.run({ testIndices: [3] })),
+    await assert.rejects(controller.evaluate(() => __mobilePlaywright.viewport({ width: 600, height: 400 })),
         /Mobile framebuffer is 200x400, expected 600x400/);
 });

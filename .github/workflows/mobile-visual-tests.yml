@@ -23,8 +23,16 @@ on:
       ios-os:
         type: string
         default: '26'
-      test-indices:
-        description: Optional JSON array of native catalog indices; empty runs all eligible scenes
+      babylonjs-repository:
+        description: Trusted repository containing the shared native Playwright suite
+        type: string
+        default: BabylonJS/Babylon.js
+      babylonjs-ref:
+        description: Full Babylon.js commit SHA with external native transport support
+        type: string
+        default: ''
+      test-grep:
+        description: Optional Playwright test-title expression; empty runs all eligible shared scenes
         type: string
         default: ''
 
@@ -108,13 +116,26 @@ jobs:
       - name: Require approved cloud configuration
         env:
           APPROVED: ${{ vars.MOBILE_TESTING_APPROVED }}
-        run: test "$APPROVED" = true || { echo "Configure and approve the browserstack-mobile environment first"; exit 1; }
+          BABYLONJS_REF: ${{ inputs.babylonjs-ref }}
+        run: |
+          test "$APPROVED" = true || { echo "Configure and approve the browserstack-mobile environment first"; exit 1; }
+          [[ "$BABYLONJS_REF" =~ ^[a-fA-F0-9]{40}$ ]] || { echo "Select a full trusted Babylon.js commit SHA"; exit 1; }
       - uses: actions/checkout@v5
+      - uses: actions/checkout@v5
+        with:
+          repository: ${{ inputs.babylonjs-repository }}
+          ref: ${{ inputs.babylonjs-ref }}
+          path: Build/BabylonJS
       - uses: actions/setup-node@v4
         with:
-          node-version: '22'
-          cache: npm
-          cache-dependency-path: Apps/Playground/Tests/Mobile/package-lock.json
+          node-version: '24'
+      - name: Install the shared-suite package manager
+        run: |
+          npm install --prefix "$RUNNER_TEMP/shared-npm" npm@11.18.0 --no-audit --no-fund
+          echo "$RUNNER_TEMP/shared-npm/node_modules/npm/bin" >> "$GITHUB_PATH"
+      - name: Prepare the shared Babylon.js suite
+        working-directory: Build/BabylonJS
+        run: npm ci --no-audit --no-fund
       - uses: actions/download-artifact@v4
         with:
           name: mobile-app-${{ matrix.platform }}
@@ -124,7 +145,9 @@ jobs:
         run: npm ci
       - name: Run protocol and image controls
         working-directory: Apps/Playground/Tests/Mobile
-        run: npm test
+        env:
+          BABYLON_JS_ROOT: ${{ github.workspace }}/Build/BabylonJS
+        run: npm test && npm run test:shared
       - name: Install BrowserStack Local
         run: |
           mkdir -p "$RUNNER_TEMP/browserstack-local"
@@ -144,7 +167,8 @@ jobs:
           MOBILE_DEVICE: ${{ matrix.platform == 'ios' && inputs.ios-device || inputs.android-device }}
           MOBILE_OS_VERSION: ${{ matrix.platform == 'ios' && inputs.ios-os || inputs.android-os }}
           MOBILE_APP: ${{ github.workspace }}/Build/MobileApp/${{ matrix.platform == 'ios' && 'Playground.ipa' || 'app-release.apk' }}
-          MOBILE_TEST_INDICES: ${{ inputs.test-indices }}
+          BABYLON_JS_ROOT: ${{ github.workspace }}/Build/BabylonJS
+          MOBILE_TEST_GREP: ${{ inputs.test-grep }}
         run: npm run visual
       - uses: actions/upload-artifact@v4
         if: always()

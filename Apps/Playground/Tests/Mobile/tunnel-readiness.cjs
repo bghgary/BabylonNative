@@ -1,15 +1,18 @@
 async function waitForCloudTunnel({
-    key, identifier, timeoutMs = 60_000, request = fetch,
+    key, identifier, timeoutMs = 60_000, request = fetch, signal,
     sleep = ms => new Promise(resolve => setTimeout(resolve, ms))
 }) {
     const started = performance.now();
     let polls = 0;
     while (performance.now() - started < timeoutMs) {
+        signal?.throwIfAborted();
         let response;
         try {
             response = await request("https://www.browserstack.com/local/v1/list?auth_token=" +
                 encodeURIComponent(key) + "&state=running&last=100", {
-                redirect: "error", signal: AbortSignal.timeout(Math.min(15_000, timeoutMs))
+                redirect: "error", signal: signal
+                    ? AbortSignal.any([signal, AbortSignal.timeout(Math.min(15_000, timeoutMs))])
+                    : AbortSignal.timeout(Math.min(15_000, timeoutMs))
             });
         } catch {
             // This URL contains the access key; never propagate a fetch error containing it.
