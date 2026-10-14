@@ -12,6 +12,7 @@
 
 #include <Shared/CommandLine.h>
 #include <Shared/Diagnostics.h>
+#include <Shared/PlaywrightBridge.h>
 #include <Shared/PlaygroundScripts.h>
 
 #include <Windows.h>
@@ -23,6 +24,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
+#include <fstream>
 #include <iostream>
 #include <memory>
 #include <optional>
@@ -43,6 +45,8 @@ std::optional<Babylon::Embedding::Runtime> g_runtime;
 // Window-scoped: created on InitInstance after CreateWindowW returns,
 // destroyed on WM_DESTROY (or torn down + recreated by RefreshBabylon).
 std::optional<Babylon::Embedding::View> g_view;
+
+std::optional<Playground::PlaywrightBridge> g_playwrightBridge;
 
 bool minimized{false};
 PlaygroundOptions options{};
@@ -95,6 +99,26 @@ namespace
         Babylon::Embedding::RuntimeOptions runtimeOptions{};
         runtimeOptions.enableDebugger = !options.Headless;
         runtimeOptions.enableDebugTrace = options.DebugTrace.value_or(true);
+        if (options.Playwright)
+        {
+            runtimeOptions.log = [diagnostics = Playground::MakeLogCallback([](std::string_view) {})](Babylon::Embedding::LogLevel level, std::string_view text) {
+                if (g_playwrightBridge)
+                {
+                    const char* levelName = "log";
+                    if (level == Babylon::Embedding::LogLevel::Warn)
+                    {
+                        levelName = "warning";
+                    }
+                    else if (level == Babylon::Embedding::LogLevel::Error || level == Babylon::Embedding::LogLevel::Fatal)
+                    {
+                        levelName = "error";
+                    }
+                    g_playwrightBridge->SendConsole(levelName, text);
+                }
+                diagnostics(level, text);
+            };
+            return runtimeOptions;
+        }
         runtimeOptions.log = Playground::MakeLogCallback([](std::string_view text) {
             std::string line{text};
             line.push_back('\n');
@@ -146,7 +170,12 @@ namespace
     {
         Playground::LoadBootstrapScripts(*g_runtime);
 
-        if (options.Scripts.empty())
+        if (options.Playwright)
+        {
+            g_runtime->LoadScript("app:///Scripts/playwright.js");
+            return;
+        }
+        else if (options.Scripts.empty())
         {
             g_runtime->LoadScript("app:///Scripts/experience.js");
         }
@@ -157,6 +186,122 @@ namespace
                 g_runtime->LoadScript(GetUrlFromPath(arg));
             }
             g_runtime->LoadScript("app:///Scripts/playground_runner.js");
+        }
+    }
+
+    std::string GetJavaScriptError(const Napi::Value& value)
+    {
+        if (value.IsObject())
+        {
+            const auto object = value.As<Napi::Object>();
+            const auto stack = object.Get("stack");
+            if (stack.IsString())
+            {
+                return stack.As<Napi::String>().Utf8Value();
+            }
+        }
+        return value.ToString().Utf8Value();
+    }
+
+    void HandlePlaywrightEvaluate(Playground::PlaywrightBridge::Command command)
+    {
+        g_runtime->RunOnJsThread([command = std::move(command)](Napi::Env env) {
+            try
+            {
+                const auto evaluated = env.Global().Get("eval").As<Napi::Function>().Call(
+                    env.Global(),
+                    {Napi::String::New(env, command.Payload)});
+                const auto promise = evaluated.As<Napi::Promise>();
+                const auto onFulfilled = Napi::Function::New(env, [id = command.Id](const Napi::CallbackInfo& info) {
+                    g_playwrightBridge->SendResult(id, info[0].ToString().Utf8Value());
+                });
+                const auto onRejected = Napi::Function::New(env, [id = command.Id](const Napi::CallbackInfo& info) {
+                    g_playwrightBridge->SendError(id, GetJavaScriptError(info[0]));
+                });
+                promise.Get("then").As<Napi::Function>().Call(promise, {onFulfilled, onRejected});
+            }
+            catch (const Napi::Error& error)
+            {
+                g_playwrightBridge->SendError(command.Id, error.Message());
+            }
+            catch (const std::exception& error)
+            {
+                g_playwrightBridge->SendError(command.Id, error.what());
+            }
+        }, true);
+    }
+
+    void HandlePlaywrightScreenshot(Playground::PlaywrightBridge::Command command)
+    {
+        const auto outputPath = std::filesystem::temp_directory_path() /
+            ("babylon-native-playwright-" + std::to_string(GetCurrentProcessId()) + "-" + std::to_string(command.Id) + ".png");
+        g_runtime->RunOnJsThread([command = std::move(command), outputPath](Napi::Env env) {
+            try
+            {
+                const auto screenshot = env.Global().Get("__babylonNativeScreenshot").As<Napi::Object>();
+                const auto testUtils = env.Global().Get("TestUtils").As<Napi::Object>();
+                testUtils.Get("writePNG").As<Napi::Function>().Call(
+                    testUtils,
+                    {
+                        screenshot.Get("data"),
+                        screenshot.Get("width"),
+                        screenshot.Get("height"),
+                        Napi::String::New(env, outputPath.generic_string()),
+                    });
+
+                std::ifstream stream{outputPath, std::ios::binary | std::ios::ate};
+                if (!stream)
+                {
+                    throw std::runtime_error{"Failed to open captured PNG"};
+                }
+                const auto size = static_cast<size_t>(stream.tellg());
+                std::vector<uint8_t> png(size);
+                stream.seekg(0);
+                stream.read(reinterpret_cast<char*>(png.data()), static_cast<std::streamsize>(png.size()));
+                stream.close();
+                std::filesystem::remove(outputPath);
+                env.Global().Delete("__babylonNativeScreenshot");
+                g_playwrightBridge->SendBinaryResult(command.Id, png.data(), png.size());
+            }
+            catch (const Napi::Error& error)
+            {
+                std::filesystem::remove(outputPath);
+                g_playwrightBridge->SendError(command.Id, error.Message());
+            }
+            catch (const std::exception& error)
+            {
+                std::filesystem::remove(outputPath);
+                g_playwrightBridge->SendError(command.Id, error.what());
+            }
+        }, true);
+    }
+
+    void HandlePlaywrightCommands(HWND hWnd)
+    {
+        while (const auto command = g_playwrightBridge->TakeCommand())
+        {
+            if (!g_runtime || !g_view)
+            {
+                g_playwrightBridge->SendError(command->Id, "BabylonNative is shutting down");
+                continue;
+            }
+            switch (command->CommandMethod)
+            {
+                case Playground::PlaywrightBridge::Method::Evaluate:
+                    HandlePlaywrightEvaluate(*command);
+                    break;
+                case Playground::PlaywrightBridge::Method::Resize:
+                    g_view->Resize(command->Width, command->Height, Babylon::Embedding::CoordinateUnits::Physical);
+                    g_playwrightBridge->SendResult(command->Id, "{}");
+                    break;
+                case Playground::PlaywrightBridge::Method::Screenshot:
+                    HandlePlaywrightScreenshot(*command);
+                    break;
+                case Playground::PlaywrightBridge::Method::Close:
+                    g_playwrightBridge->SendResult(command->Id, "{}");
+                    PostMessage(hWnd, WM_CLOSE, 0, 0);
+                    break;
+            }
         }
     }
 
@@ -189,6 +334,14 @@ namespace
             g_view->Resize(static_cast<uint32_t>(rect.right - rect.left),
                            static_cast<uint32_t>(rect.bottom - rect.top),
                            Babylon::Embedding::CoordinateUnits::Physical);
+        }
+
+        if (options.Playwright)
+        {
+            g_playwrightBridge->Start(hWnd);
+            g_runtime->RunOnJsThread([](Napi::Env) {
+                g_playwrightBridge->SendReady();
+            }, true);
         }
     }
 }
@@ -244,6 +397,11 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
         CommandLine::PrintUsage(argv.empty() ? nullptr : argv[0]);
         Diagnostics::SetExitCode(0);
         return 0;
+    }
+
+    if (options.Playwright)
+    {
+        g_playwrightBridge.emplace();
     }
 
     // Initialize global strings
@@ -375,6 +533,11 @@ LRESULT CALLBACK WndProc(HWND hWnd, UINT message, WPARAM wParam, LPARAM lParam)
 
     switch (message)
     {
+        case Playground::PlaywrightBridge::CommandMessage:
+        {
+            HandlePlaywrightCommands(hWnd);
+            break;
+        }
         case WM_SYSCOMMAND:
         {
             if ((wParam & 0xFFF0) == SC_MINIMIZE)

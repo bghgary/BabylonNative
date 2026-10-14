@@ -17,6 +17,7 @@ struct PlaygroundOptions
     bool GenerateReferences = false;
     bool RunOnce = false;
     bool IncludeExcluded = false;
+    bool Playwright = false;
 
     std::optional<bool> SaveResults;
     std::optional<bool> DebugTrace;

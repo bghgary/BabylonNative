@@ -151,6 +151,13 @@ namespace
             "                              Disables the JavaScript debugger listener.\n",
             [](PlaygroundOptions& o, std::string_view, std::string&) { o.Headless = true; }},
 
+        FlagSpec{"--playwright", "", FlagKind::Boolean, "",
+            "Run as a Playwright stdio host (implies --headless).", "",
+            [](PlaygroundOptions& o, std::string_view, std::string&) {
+                o.Playwright = true;
+                o.Headless = true;
+            }},
+
         FlagSpec{"--break-on-fail", "", FlagKind::Boolean, "",
             "Trigger debugger break on a failing test.", "",
             [](PlaygroundOptions& o, std::string_view, std::string&) { o.BreakOnFail = true; }},
