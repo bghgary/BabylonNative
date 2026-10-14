@@ -38,13 +38,16 @@ test("the actual shared suite owns scene assertions, filtering, retries and work
     `);
     fs.writeFileSync(catalog, JSON.stringify({ root: "https://fixture.invalid/", tests: [
         { title: "Native transport passing scene", scriptToRun: "pass", functionToCall: "createScene", referenceImage: "fixture.png", renderCount: 3 },
-        { title: "Native transport retry scene", scriptToRun: "retry", functionToCall: "createScene", referenceImage: "fixture.png", renderCount: 2 }
+        { title: "Native transport retry scene", scriptToRun: "retry", functionToCall: "createScene", referenceImage: "fixture.png", renderCount: 2 },
+        { title: "Native transport scaled scene", scriptToRun: "scaled", functionToCall: "createScene", referenceImage: "scaled.png", renderCount: 2 },
+        { title: "Native transport after scale", scriptToRun: "pass", functionToCall: "createScene", referenceImage: "fixture.png", renderCount: 2 }
     ] }));
     const data = Buffer.alloc(600 * 400 * 4);
     for (let i = 0; i < data.length; i += 4) {
         data.set([1, 2, 3, 255], i);
     }
     fs.writeFileSync(path.join(directory, "fixture.png"), PNG.sync.write({ width: 600, height: 400, data }));
+    fs.writeFileSync(path.join(directory, "scaled.png"), PNG.sync.write({ width: 400, height: 266, data: data.subarray(0, 400 * 266 * 4) }));
     const env = {
         ...process.env, MOBILE_PLATFORM: "android", MOBILE_OUTPUT: path.join(directory, "output"),
         CONFIG_PATH: catalog, CDN_BASE_URL: "https://fixture.invalid/", TIMEOUT: "10000"
@@ -62,12 +65,18 @@ test("the actual shared suite owns scene assertions, filtering, retries and work
     let lifecycle = fs.readFileSync(events, "utf8").trim().split("\n").map(line => JSON.parse(line));
     assert.deepEqual(lifecycle.map(item => item.phase), ["start", "stop"]);
     fs.writeFileSync(events, "");
+    const scaled = run(["--grep", "scaled scene|after scale", "--workers", "1"]);
+    assert.equal(scaled.stats.expected, 2);
+    assert.equal(scaled.stats.unexpected, 0);
+    lifecycle = fs.readFileSync(events, "utf8").trim().split("\n").map(line => JSON.parse(line));
+    assert.deepEqual(lifecycle.map(item => item.phase), ["start", "stop"]);
+    fs.writeFileSync(events, "");
     const all = run(["--workers", "2", "--retries", "1"]);
-    assert.equal(all.stats.expected, 1);
+    assert.equal(all.stats.expected, 3);
     assert.equal(all.stats.flaky, 1);
     assert.equal(all.stats.unexpected, 0);
     const specs = all.suites.flatMap(suite => suite.specs);
-    assert.equal(specs.length, 2);
+    assert.equal(specs.length, 4);
     const retry = specs.find(spec => spec.title === "Native transport retry scene").tests[0];
     assert.deepEqual(retry.results.map(result => result.status), ["failed", "passed"]);
     assert.notEqual(retry.results[0].workerIndex, retry.results[1].workerIndex);

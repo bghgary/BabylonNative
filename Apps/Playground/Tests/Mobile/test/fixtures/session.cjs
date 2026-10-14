@@ -32,8 +32,10 @@ function sessionFactory(options = {}) {
         });
         vm.runInContext(`
             class Engine {
-                getRenderWidth() { return 600; }
-                getRenderHeight() { return 400; }
+                static scaling = 1;
+                getRenderWidth() { return Math.floor(600 / Engine.scaling); }
+                getRenderHeight() { return Math.floor(400 / Engine.scaling); }
+                setHardwareScalingLevel(value) { Engine.scaling = value; }
                 getCaps() { return {}; }
                 dispose() { this.stopRenderLoop(); }
                 runRenderLoop(callback) {
@@ -54,10 +56,13 @@ function sessionFactory(options = {}) {
                 DracoDecoder: {}, MeshoptCompression: {Configuration: {}}, GLTFValidation: {},
                 KhronosTextureContainer2: {}, BasisToolsOptions: {}, NodeMaterial: {}
             };
-            globalThis.__fixtureScene = title => ({
-                title, dispose() {}, render() {}, isReady() { return true; },
-                executeWhenReady(callback) { callback(); }
-            });
+            globalThis.__fixtureScene = title => {
+                if (title === "scaled") { engine.setHardwareScalingLevel(1.5); }
+                return {
+                    title, dispose() {}, render() {}, isReady() { return true; },
+                    executeWhenReady(callback) { callback(); }
+                };
+            };
         `, context);
         context.TestUtils = {
             getGraphicsApiName: () => options.api || "OpenGL",
@@ -66,7 +71,7 @@ function sessionFactory(options = {}) {
                 if (fail) {
                     fs.writeFileSync(options.retryMarker, "failed first attempt");
                 }
-                const data = new Uint8Array(600 * 400 * 4);
+                const data = new Uint8Array(context.engine.getRenderWidth() * context.engine.getRenderHeight() * 4);
                 for (let i = 0; i < data.length; i += 4) {
                     data.set(fail ? [255, 255, 255, 255] : [1, 2, 3, 255], i);
                 }

@@ -50,7 +50,7 @@ npm run visual -- --workers 2 --retries 1
 npm run visual -- --shard 1/2
 ```
 
-One worker owns one cloud device and tunnel. Successful scenes reuse the engine according to the shared suite; failed tests retire that worker and release its session before replacement. Default is one worker with no test retries. Increase workers only within available paid capacity, leaving room for other users. Sharding divides the shared Playwright tests, not native-catalog indices. Snapshot updates and replacement projects/configurations are forbidden.
+One worker owns one cloud device and tunnel. Successful scenes reuse the engine according to the shared suite; native cleanup restores hardware scale 1 so a scene's scaling cannot affect later screenshots. Failed tests retire that worker and release its session before replacement. Default is one worker with no test retries. Increase workers only within available paid capacity, leaving room for other users. Sharding divides the shared Playwright tests, not native-catalog indices. Snapshot updates and replacement projects/configurations are forbidden.
 
 The runner uploads the package once per invocation and shares that exact hash-checked upload across workers and retries. There is no persistent upload cache. Discovery does not upload or allocate a device.
 
