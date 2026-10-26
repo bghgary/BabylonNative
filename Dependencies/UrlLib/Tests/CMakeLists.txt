@@ -1,3 +1,7 @@
+if(ANDROID OR IOS)
+    message(FATAL_ERROR "UrlLib unit tests are supported only on desktop platforms.")
+endif()
+
 FetchContent_Declare(googletest
     GIT_REPOSITORY https://github.com/google/googletest.git
     GIT_TAG v1.14.0)
@@ -11,11 +15,7 @@ FetchContent_MakeAvailable(googletest)
 set_property(TARGET gtest PROPERTY FOLDER Dependencies)
 set_property(TARGET gtest_main PROPERTY FOLDER Dependencies)
 
-if(ANDROID)
-    add_library(UrlLibTests SHARED UrlRequestErrorReporting.cpp SchemeResolver.cpp)
-else()
-    add_executable(UrlLibTests UrlRequestErrorReporting.cpp SchemeResolver.cpp)
-endif()
+add_executable(UrlLibTests UrlRequestErrorReporting.cpp SchemeResolver.cpp)
 
 target_link_libraries(UrlLibTests
     PRIVATE UrlLib
@@ -31,9 +31,4 @@ endif()
 
 set_property(TARGET UrlLibTests PROPERTY FOLDER Tests)
 
-if(ANDROID OR IOS)
-    include("${CMAKE_CURRENT_LIST_DIR}/../../../Apps/UnitTests/Mobile/Packaging.cmake")
-    package_mobile_unit_tests(UrlLibTests com.urllib.unittests)
-else()
-    add_test(NAME UrlLibTests COMMAND UrlLibTests)
-endif()
+add_test(NAME UrlLibTests COMMAND UrlLibTests)

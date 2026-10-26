@@ -11,7 +11,7 @@ jobs:
       - uses: actions/checkout@v5
       - uses: actions/download-artifact@v7
         with:
-          pattern: UnitTests-Android-*
+          pattern: UnitTests-Android-JsRuntimeHost-*
           path: test-artifacts
       - name: Enable emulator acceleration
         run: sudo chmod 0666 /dev/kvm
@@ -78,47 +78,40 @@ jobs:
             fi
             shopt -s nullglob
             artifacts=(test-artifacts/*)
-            [[ ${#artifacts[@]} -eq 6 ]] || { echo "::error::Expected exactly six Android artifacts"; exit 1; }
+            [[ ${#artifacts[@]} -eq 3 ]] || { echo "::error::Expected exactly three Android artifacts"; exit 1; }
             for engine in JavaScriptCore V8 QuickJS; do
-              for component in JsRuntimeHost UrlLib; do
-                directory="test-artifacts/UnitTests-Android-$component-$engine"
-                test -f "$directory/app.apk"
-                test -f "$directory/tests.apk"
-              done
+              directory="test-artifacts/UnitTests-Android-JsRuntimeHost-$engine"
+              test -f "$directory/app.apk"
+              test -f "$directory/tests.apk"
             done
             failed=()
+            application=com.jsruntimehost.unittests
             for engine in JavaScriptCore V8 QuickJS; do
-              for component in JsRuntimeHost UrlLib; do
-                name="UnitTests-Android-$component-$engine"
-                directory="test-artifacts/$name"
-                case "$component" in
-                  JsRuntimeHost) application=com.jsruntimehost.unittests ;;
-                  UrlLib) application=com.urllib.unittests ;;
-                esac
-                echo "::group::Running $name"
-                set +e
-                (
-                  set -euo pipefail
-                  installed=()
-                  trap 'code=$?; for package in "${installed[@]}"; do timeout 120s adb uninstall "$package" || code=1; done; exit "$code"' EXIT
-                  timeout 120s adb install -r "$directory/app.apk"
-                  installed+=("$application")
-                  timeout 120s adb install -r "$directory/tests.apk"
-                  installed=("$application.test" "$application")
-                  timeout 120s adb shell pm clear "$application"
-                  timeout 20m adb shell am instrument -w -r \
-                    "$application.test/androidx.test.runner.AndroidJUnitRunner" 2>&1 | tee "test-results/$name.log"
-                  grep -Eq '^OK \([1-9][0-9]* tests?\)[[:space:]]*$' "test-results/$name.log"
-                  grep -Eq '^INSTRUMENTATION_CODE: -1[[:space:]]*$' "test-results/$name.log"
-                )
-                result=$?
-                set -e
-                if [[ $result -ne 0 ]]; then
-                  echo "::error::$name failed (exit $result)"
-                  failed+=("$name")
-                fi
-                echo "::endgroup::"
-              done
+              name="UnitTests-Android-JsRuntimeHost-$engine"
+              directory="test-artifacts/$name"
+              echo "::group::Running $name"
+              set +e
+              (
+                set -euo pipefail
+                installed=()
+                trap 'code=$?; for package in "${installed[@]}"; do timeout 120s adb uninstall "$package" || code=1; done; exit "$code"' EXIT
+                timeout 120s adb install -r "$directory/app.apk"
+                installed+=("$application")
+                timeout 120s adb install -r "$directory/tests.apk"
+                installed=("$application.test" "$application")
+                timeout 120s adb shell pm clear "$application"
+                timeout 20m adb shell am instrument -w -r \
+                  "$application.test/androidx.test.runner.AndroidJUnitRunner" 2>&1 | tee "test-results/$name.log"
+                grep -Eq '^OK \([1-9][0-9]* tests?\)[[:space:]]*$' "test-results/$name.log"
+                grep -Eq '^INSTRUMENTATION_CODE: -1[[:space:]]*$' "test-results/$name.log"
+              )
+              result=$?
+              set -e
+              if [[ $result -ne 0 ]]; then
+                echo "::error::$name failed (exit $result)"
+                failed+=("$name")
+              fi
+              echo "::endgroup::"
             done
             if [[ ${#failed[@]} -ne 0 ]]; then
               printf 'Failed: %s\n' "${failed[@]}"
