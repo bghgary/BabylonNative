@@ -216,6 +216,7 @@ jobs:
         if: failure()
         shell: powershell
         run: |
+          New-Item -ItemType Directory -Force -Path "$env:RUNNER_TEMP\Dumps" | Out-Null
           Copy-Item -Path "build\${{ steps.vars.outputs.solution_name }}\Apps\UnitTests\RelWithDebInfo\UnitTests.*" -Destination "$env:RUNNER_TEMP\Dumps\" -ErrorAction SilentlyContinue
 
       - name: Upload Crash Dumps
