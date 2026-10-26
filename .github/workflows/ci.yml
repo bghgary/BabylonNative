@@ -130,19 +130,19 @@ jobs:
   Android_Ubuntu_JSC:
     uses: ./.github/workflows/build-android.yml
     with:
-      runs-on: ubuntu-latest
+      runs-on: ubuntu-24.04
       js-engine: JavaScriptCore
 
   Android_Ubuntu_V8:
     uses: ./.github/workflows/build-android.yml
     with:
-      runs-on: ubuntu-latest
+      runs-on: ubuntu-24.04
       js-engine: V8
 
   Android_Ubuntu_QuickJS:
     uses: ./.github/workflows/build-android.yml
     with:
-      runs-on: ubuntu-latest
+      runs-on: ubuntu-24.04
       js-engine: QuickJS
 
   AndroidTests:
@@ -198,7 +198,7 @@ jobs:
       - Linux_Installation
       - MacOS_Installation
       - Win32_Installation
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 5
     steps:
       - name: Verify all jobs succeeded
