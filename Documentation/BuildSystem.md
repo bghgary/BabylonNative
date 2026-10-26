@@ -57,7 +57,10 @@ Select the shared suite with Android's `-Pcomponent` or CMake's
 features report explicit GoogleTest skips, not a replacement empty suite.
 The Android producer installs SDK CMake 3.30.3, matching the Gradle harness.
 Apps installs its npm workspace before configuring child applications, so
-mobile test bundles can run webpack during a clean CMake configuration.
+test bundles can run webpack during the build. BabylonNative's bundles are
+generated in the unit-test binary directory; Android packaging collects those
+generated assets for the selected build variant, and iOS includes them as bundle
+resources. No checked-in JavaScript bundles are required.
 The iOS harness disables the toolchain's global ARC default before its first
 `project()` call, preserving bgfx's manual Objective-C ownership.
 

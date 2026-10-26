@@ -19,18 +19,17 @@ The former gitlinks now correspond to pinned CMake source acquisitions:
 
 | Source | Repository | Revision |
 |---|---|---|
-| bgfx | https://github.com/BabylonJS/bgfx | `64e7324430604ba61a45b51e1cbeb2b67c5d1d15` |
-| bx | https://github.com/bkaradzic/bx | `a9a71f8ef449c11042607feaeae0b8f46d22869a` |
-| bimg | https://github.com/bkaradzic/bimg | `671fe06dd7012a1ab85aa931019ed16112909756` |
+| bgfx | https://github.com/BabylonJS/bgfx | `5068996b4161522bc7d8cd1c7fb6b95e11771006` |
+| bx | https://github.com/bkaradzic/bx | `f3a9adb603c5677731e7cf10622fa16e1dfe9ea5` |
+| bimg | https://github.com/bkaradzic/bimg | `9bfbd6493b48a15238f2d1374a718ec026524515` |
 
 The wrapper's `CMakeLists.txt` and `cmake/dependencies.cmake` are unchanged
 copies from https://github.com/bkaradzic/bgfx.cmake at
 `dbc15d21e7744887d543d0c80278fe26fbb0f5f0`. This is a BabylonNative
 integration change, not a new history import: the original import tip and
-commit map above remain unchanged. The three child revisions above remain
-pinned because the newer upstream bgfx revision no longer supplies
-`stb_truetype.h`, which BabylonNative still includes; upgrading the child
-sources needs a separate compatibility change. BabylonNative's declarations
+commit map above remain unchanged. The three child revisions above track the
+source-pin update in BabylonNative [#1961](https://github.com/BabylonJS/BabylonNative/pull/1961),
+independently of the wrapper's fallback pins. BabylonNative's declarations
 remain in the repository root `CMakeLists.txt`; selection, source validation
 and target adjustments live in `Dependencies/CMakeLists.txt`. They supply all
 three source roots before entering the upstream wrapper, bypassing its fallback
