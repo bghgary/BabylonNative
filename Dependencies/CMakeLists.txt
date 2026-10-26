@@ -4,7 +4,7 @@ set(CMAKE_POLICY_DEFAULT_CMP0077 NEW)
 # AndroidExtensions
 # --------------------------------------------------
 if(ANDROID OR BABYLON_NATIVE_BUILD_SOURCETREE)
-    add_subdirectory(AndroidExtensions)
+    add_subdirectory(AndroidExtensions EXCLUDE_FROM_ALL)
 endif()
 
 # --------------------------------------------------
@@ -88,7 +88,7 @@ foreach(_bgfx_dependency IN ITEMS bx bimg bgfx)
     set(${_bgfx_root} "${_bgfx_selected}")
 endforeach()
 
-add_subdirectory(bgfx.cmake)
+add_subdirectory(bgfx.cmake EXCLUDE_FROM_ALL)
 get_directory_property(BGFX_PROJECT_VERSION DIRECTORY bgfx.cmake DEFINITION PROJECT_VERSION)
 if(BABYLON_NATIVE_BUILD_SOURCETREE)
     include(cmake/StageBgfxSources.cmake)
@@ -291,7 +291,10 @@ endif()
 # --------------------------------------------------
 # UrlLib and JsRuntimeHost
 # --------------------------------------------------
-add_subdirectory(UrlLib)
+add_subdirectory(UrlLib EXCLUDE_FROM_ALL)
+if(URLLIB_TESTS)
+    set_property(TARGET UrlLibTests PROPERTY EXCLUDE_FROM_ALL OFF)
+endif()
 add_subdirectory(JsRuntimeHost)
 
 # Two JsRuntimeHost targets cannot be built without RTTI:

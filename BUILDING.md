@@ -23,19 +23,23 @@ ignore this `build` directory.
 The bgfx CMake wrapper is tracked in `Dependencies/bgfx.cmake`; CMake fetches
 only its pinned bgfx, bx and bimg sources. Default child roots remain under
 `<build>/_deps/bgfx.cmake-src/{bgfx,bx,bimg}` and wrapper binaries under
-`<build>/_deps/bgfx.cmake-build`. Explicit `BGFX_DIR`, `BX_DIR`, `BIMG_DIR` or
+`<build>/Dependencies/bgfx.cmake`. Explicit `BGFX_DIR`, `BX_DIR`, `BIMG_DIR` or
 standard child `FETCHCONTENT_SOURCE_DIR_*` overrides select local trees.
-`FETCHCONTENT_SOURCE_DIR_BGFX.CMAKE` is supported as a local wrapper override.
+The root always uses the tracked wrapper, not a wrapper-source override.
 See the [wrapper documentation](Dependencies/bgfx.cmake/README.md) for precedence,
 disconnected builds and Git-free source packaging.
 
-AndroidExtensions and CMakeExtensions are vendored with their history in
-`Dependencies/AndroidExtensions` and `Dependencies/CMakeExtensions`. The root
-`CMakeLists.txt` unconditionally sets `FETCHCONTENT_SOURCE_DIR_ANDROIDEXTENSIONS`
-and `FETCHCONTENT_SOURCE_DIR_CMAKEEXTENSIONS` to these folders, so every declaration
-uses these copies, including those in fetched dependencies such as JsRuntimeHost.
-Source-tree packaging uses these tracked folders; no `_deps/*-src` copies are
-produced for these two dependencies.
+AndroidExtensions, CMakeExtensions, JsRuntimeHost and UrlLib are vendored with
+their history under `Dependencies/`. The root includes CMakeExtensions as a shared
+helper module and adds the other components with `add_subdirectory`, without
+FetchContent source overrides for these in-tree components. Their nested projects
+also use these sibling directories instead of fetching the former standalone
+repositories. Build files live under `<build>/Dependencies/`; source-tree packaging
+uses the tracked sources without producing `_deps/*-src` compatibility copies.
+
+AndroidExtensions, the bgfx wrapper and UrlLib retain `EXCLUDE_FROM_ALL`, so
+unneeded dependency targets do not enter the default build. JsRuntimeHost's public
+targets remain in the default build, as do enabled component unit tests.
 
 **NOTE:** CMake considers what are sometimes called "build flavors" (Win32/x86 versus
 Win32/x64 versus UWP/x64, etc.) to be entirely different build targets which should have
