@@ -75,9 +75,13 @@ FetchContent_Declare(SPIRV-Cross
 
 include(Dependencies/CMakeExtensions/CMakeLists.txt)
 
-# Source-tree mode fetches platform dependencies for packaging on any host.
-# Packages include tracked dependencies from Dependencies/ and downloaded sources
-# from _deps; consumers supply local source overrides for offline builds.
+# BABYLON_NATIVE_BUILD_SOURCETREE flag is used by BabylonReactNative NPM build process.
+# CMake script is run twice. At package creation, BABYLON_NATIVE_BUILD_SOURCETREE is ON
+# which makes all dependencies to be fetched and packaged.
+# At build time, cmake is run again on BabylonNative root but FETCHCONTENT_FULLY_DISCONNECTED is ON
+# and FetchContent uses the provided local source overrides.
+# AndroidExtensions, CMakeExtensions, JsRuntimeHost and UrlLib are maintained
+# in Dependencies/ and added as subdirectories; no _deps/*-src copies are produced.
 
 if(VISIONOS OR IOS OR BABYLON_NATIVE_BUILD_SOURCETREE)
     FetchContent_MakeAvailable_With_Message(ios-cmake)
