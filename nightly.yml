@@ -36,6 +36,9 @@ variables:
 jobs:
 - job: Nightly
   displayName: Nightly
+  # Packaged VisualizationTests alone take ~40 min and grow as tests are enabled; the default
+  # 60 min job limit cancels the run before the packages Babylon.js consumes are uploaded.
+  timeoutInMinutes: 180
   steps:
   - checkout: self
 
@@ -274,7 +277,8 @@ jobs:
   displayName: Linux Clang Hermes
   timeoutInMinutes: 60
   pool:
-    vmImage: 'ubuntu-latest'
+    # TODO(#1970): return to ubuntu-latest once the glslang pin includes the <cstdint> fix.
+    vmImage: 'ubuntu-24.04'
   variables:
     CC: clang
     CXX: clang++
@@ -350,7 +354,8 @@ jobs:
   displayName: Android Hermes
   timeoutInMinutes: 45
   pool:
-    vmImage: 'ubuntu-latest'
+    # TODO(#1970): return to ubuntu-latest once the glslang pin includes the <cstdint> fix.
+    vmImage: 'ubuntu-24.04'
   variables:
     NDK_VERSION: '28.2.13676358'
   steps:
