@@ -27,7 +27,7 @@ only its pinned bgfx, bx and bimg sources. Default child roots are
 `FETCHCONTENT_SOURCE_DIR_BGFX`, `_BX` and `_BIMG` overrides
 select local trees.
 The root always uses the tracked wrapper, not a wrapper-source override.
-See the [wrapper integration notes](Dependencies/bgfx.cmake/UPSTREAM.md#babylonnative-integration)
+See the bgfx notes in [Dependencies/CMakeLists.txt](Dependencies/CMakeLists.txt)
 for source selection. Source packages must include the tracked wrapper and each
 selected child source tree separately.
 
