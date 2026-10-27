@@ -44,8 +44,9 @@ BabylonNative's existing history was not rewritten.
 
 The wrapper matches https://github.com/bkaradzic/bgfx.cmake at
 5ae5fa5b121974b9de084539bb784d97fa4cd8a6 plus proposed upstream changes:
-bx/bimg/bgfx FetchContent names, removal of nonexistent source subdirectories
-and redundant GIT_SHALLOW FALSE settings, and corresponding README updates.
+bx/bimg/bgfx FetchContent names, inline fallback pins, removal of nonexistent
+source subdirectories and redundant GIT_SHALLOW FALSE settings, and corresponding
+README and release-helper updates.
 Its fallback pins match that baseline; BabylonNative's root CMakeLists.txt
 declares the native pins first and selects _deps/{bgfx,bx,bimg}-src.
 Source overrides and precedence are documented in bgfx.cmake/README.md.
