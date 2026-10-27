@@ -59,8 +59,8 @@ endif()
 
 add_subdirectory(bgfx.cmake EXCLUDE_FROM_ALL)
 
-# Plugins and apps use these source paths, but the wrapper defines them only
-# in its own directory scope.
+# Plugins and apps currently need these paths from the wrapper's directory scope.
+# TODO: Review those consumers and remove the source-path exports if possible.
 get_directory_property(BGFX_DIR DIRECTORY bgfx.cmake DEFINITION BGFX_DIR)
 get_directory_property(BIMG_DIR DIRECTORY bgfx.cmake DEFINITION BIMG_DIR)
 set(BGFX_DIR "${BGFX_DIR}" PARENT_SCOPE)
