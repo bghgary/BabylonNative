@@ -21,15 +21,15 @@ the `build` directory from the repository root. The `.gitignore` file is set up 
 ignore this `build` directory.
 
 The bgfx CMake wrapper is tracked in `Dependencies/bgfx.cmake`; CMake fetches
-only its pinned bgfx, bx and bimg sources. Default child roots remain under
-`<build>/_deps/bgfx.cmake-src/{bgfx,bx,bimg}` and wrapper binaries under
+only its pinned bgfx, bx and bimg sources. Default child roots are
+`<build>/_deps/{bgfx,bx,bimg}-src` and wrapper binaries are under
 `<build>/Dependencies/bgfx.cmake`. Explicit `BGFX_DIR`, `BX_DIR`, `BIMG_DIR` or
-`FETCHCONTENT_SOURCE_DIR_BGFX_SOURCE`, `_BX_SOURCE` and `_BIMG_SOURCE` overrides
-select local trees. The former `_BGFX`, `_BX` and `_BIMG` override names remain
-supported; nonempty overrides using the new names take precedence over them.
+`FETCHCONTENT_SOURCE_DIR_BGFX`, `_BX` and `_BIMG` overrides
+select local trees.
 The root always uses the tracked wrapper, not a wrapper-source override.
 See the [wrapper integration notes](Dependencies/bgfx.cmake/UPSTREAM.md#babylonnative-integration)
-for source selection and source-tree packaging.
+for source selection. Source packages must include the tracked wrapper and each
+selected child source tree separately.
 
 AndroidExtensions, CMakeExtensions, JsRuntimeHost and UrlLib are vendored with
 their history under `Dependencies/`. The root includes CMakeExtensions as a shared

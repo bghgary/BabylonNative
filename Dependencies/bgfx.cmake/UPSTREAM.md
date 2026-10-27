@@ -23,33 +23,36 @@ The former gitlinks now correspond to pinned CMake source acquisitions:
 | bx | https://github.com/bkaradzic/bx | `f3a9adb603c5677731e7cf10622fa16e1dfe9ea5` |
 | bimg | https://github.com/bkaradzic/bimg | `9bfbd6493b48a15238f2d1374a718ec026524515` |
 
+## Current wrapper
+
 Apart from this file, `UPSTREAM_COMMIT_MAP.txt` and the excluded `.github`
-directory, the wrapper is an unchanged copy of
-https://github.com/bkaradzic/bgfx.cmake at
-`dbc15d21e7744887d543d0c80278fe26fbb0f5f0`. This is a BabylonNative
-integration change, not a new history import: the original import tip and
-commit map above remain unchanged. The three child revisions above track the
-source-pin update in BabylonNative [#1961](https://github.com/BabylonJS/BabylonNative/pull/1961),
-independently of the wrapper's fallback pins. The obsolete
-`cmake/babylon-native.cmake` integration file was removed.
+directory, the wrapper matches https://github.com/bkaradzic/bgfx.cmake at
+`5ae5fa5b121974b9de084539bb784d97fa4cd8a6` plus the changes intended for
+upstream: FetchContent names `bx`, `bimg` and `bgfx`, no nonexistent source
+subdirectory overrides or redundant `GIT_SHALLOW FALSE` settings, and
+corresponding README updates. The wrapper's
+fallback pins match that upstream revision; BabylonNative's root declarations
+retain the separate revisions listed above.
+
+This source update does not import or rewrite history. The original import tip
+and commit map above remain unchanged.
 
 ## BabylonNative integration
 
-All BabylonNative-specific source selection and packaging lives outside this
+BabylonNative-specific source selection and target settings live outside this
 directory:
 
-- The repository root `CMakeLists.txt` declares `bx_source`, `bimg_source` and
-  `bgfx_source` with BabylonNative's pins and default source directories under
-  `${FETCHCONTENT_BASE_DIR}/bgfx.cmake-src/{bgfx,bx,bimg}`. FetchContent's first
+- The repository root `CMakeLists.txt` declares `bx`, `bimg` and
+  `bgfx` with BabylonNative's pins and standard source directories under
+  `${FETCHCONTENT_BASE_DIR}/{bgfx,bx,bimg}-src`. FetchContent's first
   declaration wins, so the wrapper selects those sources instead of its fallback
-  pins. The root also forwards the legacy `FETCHCONTENT_SOURCE_DIR_BGFX`, `_BX`
-  and `_BIMG` overrides to the `_SOURCE` names when those are empty.
+  pins. `FETCHCONTENT_SOURCE_DIR_BGFX`, `_BX` and `_BIMG` overrides select
+  those sources directly.
 - `Dependencies/CMakeLists.txt` sets wrapper options, adds this directory with
   `add_subdirectory` and adjusts the resulting targets.
-- `Dependencies/cmake/StageBgfxSources.cmake` stages this wrapper beside the
-  selected child sources in `_deps/bgfx.cmake-src` for
-  `BABYLON_NATIVE_BUILD_SOURCETREE=ON` packages, which can be configured directly
-  as a standalone offline build.
+
+Source packages must include this tracked wrapper and the selected child source
+trees separately; consumers supply the child source overrides for offline builds.
 
 `BGFX_DIR`, `BX_DIR` and `BIMG_DIR` keep the upstream wrapper's precedence and
 semantics described in [README.md](README.md).
@@ -71,27 +74,15 @@ updates managed sources on reconfigure but never checks out explicit roots.
 
 ## Exporting wrapper changes upstream
 
-Keep vendor-only exclusions separate from upstreamable wrapper changes when
-adding commits or importing later wrapper updates. Do not send the `.github`
-exclusion commit upstream, and do not export an unrestricted subtree diff from
-the import tip: that would delete upstream's automation.
+Prepare the wrapper changes in a standalone checkout of the current upstream
+revision above. Keep its wrapper files identical to this directory, excluding
+the BabylonNative provenance files, and preserve upstream's `.github` directory.
+The dependency-name change also requires updating the fetched-source paths in
+upstream's release workflow.
 
-From the BabylonNative root, the following exports candidate wrapper CMake
-changes without `.github`, BabylonNative integration/staging helpers, or provenance:
-
-```powershell
-git -C Dependencies\bgfx.cmake diff --binary --relative `
-  --output=..\..\build\bgfx-wrapper.patch `
-  39f003f6ae0b6e92b1c3bd0152f164c0e56000b2 HEAD -- `
-  CMakeLists.txt .gitmodules cmake
-```
-
-Create `build` first if needed. Review the candidate patch in a standalone
-upstream checkout before sending it; the import deliberately removed gitlinks,
-so upstream submodule removal must be handled separately there. Adapt wrapper
-documentation for standalone use rather than copying this directory's
-BabylonNative-specific material wholesale. In particular, verify that the
-candidate contains no `.github` deletions and leaves upstream automation intact.
+Compare against that upstream revision, not the original import tip: changes
+already accepted upstream must not be proposed again. Keep BabylonNative's root
+source pins, target settings and package layout out of the upstream patch.
 
 **Do not squash this import when landing.** Upstream currently permits only
 squash merges. Landing requires a maintainer-approved history-preserving

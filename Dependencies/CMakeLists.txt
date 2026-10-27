@@ -58,17 +58,13 @@ if(WIN32 AND NOT DEFINED BIMG_CONFIG_USE_WIC)
 endif()
 
 add_subdirectory(bgfx.cmake EXCLUDE_FROM_ALL)
-foreach(_bgfx_variable BGFX_DIR BX_DIR BIMG_DIR)
-    get_directory_property(${_bgfx_variable} DIRECTORY bgfx.cmake DEFINITION ${_bgfx_variable})
-endforeach()
-get_directory_property(BGFX_PROJECT_VERSION DIRECTORY bgfx.cmake DEFINITION PROJECT_VERSION)
-if(BABYLON_NATIVE_BUILD_SOURCETREE)
-    include(cmake/StageBgfxSources.cmake)
-    bgfx_stage_sources("${CMAKE_CURRENT_SOURCE_DIR}/bgfx.cmake" "${FETCHCONTENT_BASE_DIR}/bgfx.cmake-src")
-endif()
-foreach(_bgfx_variable BGFX_DIR BX_DIR BIMG_DIR BGFX_PROJECT_VERSION)
-    set(${_bgfx_variable} "${${_bgfx_variable}}" PARENT_SCOPE)
-endforeach()
+
+# Plugins and apps use these source paths, but the wrapper defines them only
+# in its own directory scope.
+get_directory_property(BGFX_DIR DIRECTORY bgfx.cmake DEFINITION BGFX_DIR)
+get_directory_property(BIMG_DIR DIRECTORY bgfx.cmake DEFINITION BIMG_DIR)
+set(BGFX_DIR "${BGFX_DIR}" PARENT_SCOPE)
+set(BIMG_DIR "${BIMG_DIR}" PARENT_SCOPE)
 
 # Turn off debug annotations as it causes an access violation in D3D12.
 # This flag is set using compile definitions because the bgfx.cmake option is ignored in debug configuration.

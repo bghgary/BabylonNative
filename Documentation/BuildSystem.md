@@ -11,18 +11,17 @@ with `add_subdirectory` rather than FetchContent;
 their nested projects also use their siblings here instead of fetching the
 former standalone repositories. No `_deps/*-src` copies are produced for
 these components; their build files live under `Dependencies/` in the build tree.
-Targets and lateral dependency relationships are unchanged. The legacy
-`_deps/bgfx.cmake-src` source packages remain supported; the wrapper's
-build files now live under `Dependencies/bgfx.cmake`. See
+Targets and lateral dependency relationships are unchanged. The bgfx wrapper's
+build files live under `Dependencies/bgfx.cmake`. See
 [Building](../BUILDING.md) for local/offline source overrides.
-The bgfx wrapper is an unchanged copy of upstream. Babylon Native's options and
-target adjustments live in `Dependencies/CMakeLists.txt`; source-tree
-packaging lives in `Dependencies/cmake/StageBgfxSources.cmake`. The root's
-`bx_source`, `bimg_source` and `bgfx_source` FetchContent declarations retain
+The bgfx wrapper matches upstream. Babylon Native's options and
+target adjustments live in `Dependencies/CMakeLists.txt`. Source packages include
+the tracked wrapper and selected child source trees separately. The root's
+`bx`, `bimg` and `bgfx` FetchContent declarations retain
 Babylon Native's compatible child revisions. The upstream wrapper selects the
 sources using those earlier declarations rather than its fallback pins.
-Legacy `FETCHCONTENT_SOURCE_DIR_BX`, `_BIMG` and `_BGFX` overrides are forwarded
-to the corresponding `_SOURCE` names unless those already have nonempty overrides.
+`FETCHCONTENT_SOURCE_DIR_BX`, `_BIMG` and `_BGFX` overrides select those sources
+directly, without override-name forwarding.
 The root uses the pinned bgfx sources without a local GL patch. Source packages
 and local `FETCHCONTENT_SOURCE_DIR_BGFX` overrides use the same unpatched revision.
 
