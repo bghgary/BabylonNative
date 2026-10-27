@@ -24,16 +24,20 @@ Standalone configuration uses that upstream resolver and its fallback revisions,
 with default sources in `${FETCHCONTENT_BASE_DIR}/{bgfx,bx,bimg}_source-src`.
 Pass `BGFX_DIR`, `BX_DIR` and `BIMG_DIR` to build other selected source trees.
 
-Babylon Native's root does not use those fallback revisions. Its integration in
-[`../CMakeLists.txt`](../CMakeLists.txt) resolves and validates the three children
-at the root's compatible pins before adding this wrapper with `add_subdirectory`;
-it never downloads the wrapper. Default child sources remain under
+Babylon Native's root does not use those fallback revisions. Its
+[`root declarations`](../../CMakeLists.txt) use the upstream `bx_source`,
+`bimg_source` and `bgfx_source` content names with Babylon Native's compatible
+pins, so the wrapper's later declarations do not replace them.
+[`../CMakeLists.txt`](../CMakeLists.txt) adds the tracked wrapper with
+`add_subdirectory`; it never downloads the wrapper. Default child sources remain under
 `${FETCHCONTENT_BASE_DIR}/bgfx.cmake-src/{bgfx,bx,bimg}`.
 
 For the Babylon Native build, source precedence is nonempty
-`BGFX_DIR`/`BX_DIR`/`BIMG_DIR`, standard
-`FETCHCONTENT_SOURCE_DIR_BGFX`/`_BX`/`_BIMG` overrides, valid adjacent bundled
-directories, then pinned FetchContent acquisition. Explicit relative roots
+`BGFX_DIR`/`BX_DIR`/`BIMG_DIR`, valid adjacent bundled directories, then
+`FETCHCONTENT_SOURCE_DIR_BGFX_SOURCE`/`_BX_SOURCE`/`_BIMG_SOURCE` overrides
+or pinned FetchContent acquisition. The root forwards legacy
+`FETCHCONTENT_SOURCE_DIR_BGFX`/`_BX`/`_BIMG` overrides to the new names
+when the corresponding new override is empty. Explicit relative roots
 are relative to this wrapper, not the outer project. Invalid explicit roots
 fail instead of downloading replacements. Parent normal variables take
 precedence over cache values. Resolved managed roots are not cached as

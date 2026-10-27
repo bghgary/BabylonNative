@@ -1,5 +1,5 @@
 name: Build mobile unit-test artifacts
-description: Build and package JsRuntimeHost tests within a platform build job.
+description: Build JsRuntimeHost's platform test projects and publish their artifacts.
 
 inputs:
   platform:
@@ -29,10 +29,7 @@ runs:
               assembleDebug assembleDebugAndroidTest)
         project=Dependencies/JsRuntimeHost/Tests/UnitTests/Source/Android
         bash "$project/gradlew" -p "$project" "${args[@]}"
-        mkdir -p test-artifacts/JsRuntimeHost
-        cp "$project/app/build/outputs/apk/debug/app-debug.apk" test-artifacts/JsRuntimeHost/app.apk
-        cp "$project/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk" test-artifacts/JsRuntimeHost/tests.apk
-    - name: Build iOS simulator JsRuntimeHost unit tests
+    - name: Configure iOS simulator JsRuntimeHost unit tests
       if: inputs.platform == 'iOS'
       shell: bash
       env:
@@ -40,14 +37,30 @@ runs:
         DEPLOYMENT_TARGET: ${{ inputs.deployment-target }}
       run: |
         build=build/mobile-tests-JsRuntimeHost
-        app="$build/Tests/UnitTests/RelWithDebInfo-iphonesimulator/UnitTests.app"
         cmake -S Dependencies/JsRuntimeHost -B "$build" -G Xcode \
           -DIOS=ON -DPLATFORM=SIMULATORARM64 \
           "-DDEPLOYMENT_TARGET=$DEPLOYMENT_TARGET" \
           "-DNAPI_JAVASCRIPT_ENGINE=$JS_ENGINE" -DJSRUNTIMEHOST_TESTS=ON
-        cmake --build "$build" --config RelWithDebInfo --target UnitTests -- \
+    - name: Build iOS simulator JsRuntimeHost unit tests
+      if: inputs.platform == 'iOS'
+      shell: bash
+      run: |
+        cmake --build build/mobile-tests-JsRuntimeHost --config RelWithDebInfo --target UnitTests -- \
           -sdk iphonesimulator -destination 'generic/platform=iOS Simulator' \
           CODE_SIGNING_ALLOWED=NO
+    - name: Package Android unit-test artifacts
+      if: inputs.platform == 'Android'
+      shell: bash
+      run: |
+        project=Dependencies/JsRuntimeHost/Tests/UnitTests/Source/Android
+        mkdir -p test-artifacts/JsRuntimeHost
+        cp "$project/app/build/outputs/apk/debug/app-debug.apk" test-artifacts/JsRuntimeHost/app.apk
+        cp "$project/app/build/outputs/apk/androidTest/debug/app-debug-androidTest.apk" test-artifacts/JsRuntimeHost/tests.apk
+    - name: Package iOS unit-test artifacts
+      if: inputs.platform == 'iOS'
+      shell: bash
+      run: |
+        app=build/mobile-tests-JsRuntimeHost/Tests/UnitTests/RelWithDebInfo-iphonesimulator/UnitTests.app
         mkdir -p test-artifacts/JsRuntimeHost
         tar -czf test-artifacts/JsRuntimeHost/app.tar.gz -C "$(dirname "$app")" "$(basename "$app")"
     - uses: actions/upload-artifact@v6

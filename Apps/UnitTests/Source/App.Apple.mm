@@ -2,10 +2,8 @@
 #include <Babylon/DebugTrace.h>
 
 #import <Foundation/Foundation.h>
-#include <TargetConditionals.h>
 
 #include <mach-o/dyld.h>
-#include <iostream>
 
 std::filesystem::path GetExecutableDirectory()
 {
@@ -32,9 +30,5 @@ int main(int argc, char* argv[])
     config.Height = 400;
 #endif
 
-    const int result = RunTests(config, argc, argv);
-#if TARGET_OS_IPHONE
-    std::cerr << result << std::endl;
-#endif
-    return result;
+    return RunTests(config, argc, argv);
 }

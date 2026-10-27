@@ -12,6 +12,21 @@ include(FetchContent)
 
 # EXCLUDE_FROM_ALL keeps externally fetched dependencies out of ALL_BUILD.
 
+# Preserve the source overrides used before adopting the upstream content names.
+foreach(_bgfx_dependency BX BIMG BGFX)
+    set(FETCHCONTENT_SOURCE_DIR_${_bgfx_dependency} "${FETCHCONTENT_SOURCE_DIR_${_bgfx_dependency}}"
+        CACHE PATH "Override source directory for ${_bgfx_dependency}")
+    # Forwarding must not persist a legacy path in the canonical cache.
+    set(FETCHCONTENT_SOURCE_DIR_${_bgfx_dependency}_SOURCE ""
+        CACHE PATH "Override source directory for ${_bgfx_dependency}_source")
+    if(NOT "${FETCHCONTENT_SOURCE_DIR_${_bgfx_dependency}}" STREQUAL "" AND
+       "${FETCHCONTENT_SOURCE_DIR_${_bgfx_dependency}_SOURCE}" STREQUAL "")
+        get_filename_component(FETCHCONTENT_SOURCE_DIR_${_bgfx_dependency}_SOURCE
+            "${FETCHCONTENT_SOURCE_DIR_${_bgfx_dependency}}" ABSOLUTE)
+    endif()
+endforeach()
+unset(_bgfx_dependency)
+
 FetchContent_Declare(arcana.cpp
     GIT_REPOSITORY https://github.com/microsoft/arcana.cpp.git
     GIT_TAG fe41b17dedea47b5dead98f0271ca284e94ac6a8
@@ -24,23 +39,23 @@ FetchContent_Declare(base-n
     GIT_REPOSITORY https://github.com/azawadzki/base-n.git
     GIT_TAG 7573e77c0b9b0e8a5fb63d96dbde212c921993b4
     EXCLUDE_FROM_ALL)
-FetchContent_Declare(bx
+FetchContent_Declare(bx_source
     GIT_REPOSITORY https://github.com/bkaradzic/bx.git
     GIT_TAG f3a9adb603c5677731e7cf10622fa16e1dfe9ea5
     SOURCE_DIR "${FETCHCONTENT_BASE_DIR}/bgfx.cmake-src/bx"
-    SOURCE_SUBDIR "_bgfx_population_only"
+    SOURCE_SUBDIR bgfx-cmake-no-subproject
     EXCLUDE_FROM_ALL)
-FetchContent_Declare(bimg
+FetchContent_Declare(bimg_source
     GIT_REPOSITORY https://github.com/bkaradzic/bimg.git
     GIT_TAG 9bfbd6493b48a15238f2d1374a718ec026524515
     SOURCE_DIR "${FETCHCONTENT_BASE_DIR}/bgfx.cmake-src/bimg"
-    SOURCE_SUBDIR "_bgfx_population_only"
+    SOURCE_SUBDIR bgfx-cmake-no-subproject
     EXCLUDE_FROM_ALL)
-FetchContent_Declare(bgfx
+FetchContent_Declare(bgfx_source
     GIT_REPOSITORY https://github.com/BabylonJS/bgfx.git
     GIT_TAG 5068996b4161522bc7d8cd1c7fb6b95e11771006
     SOURCE_DIR "${FETCHCONTENT_BASE_DIR}/bgfx.cmake-src/bgfx"
-    SOURCE_SUBDIR "_bgfx_population_only"
+    SOURCE_SUBDIR bgfx-cmake-no-subproject
     EXCLUDE_FROM_ALL)
 FetchContent_Declare(glslang
     GIT_REPOSITORY https://github.com/BabylonJS/glslang.git

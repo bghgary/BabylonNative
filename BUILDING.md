@@ -24,7 +24,9 @@ The bgfx CMake wrapper is tracked in `Dependencies/bgfx.cmake`; CMake fetches
 only its pinned bgfx, bx and bimg sources. Default child roots remain under
 `<build>/_deps/bgfx.cmake-src/{bgfx,bx,bimg}` and wrapper binaries under
 `<build>/Dependencies/bgfx.cmake`. Explicit `BGFX_DIR`, `BX_DIR`, `BIMG_DIR` or
-standard child `FETCHCONTENT_SOURCE_DIR_*` overrides select local trees.
+`FETCHCONTENT_SOURCE_DIR_BGFX_SOURCE`, `_BX_SOURCE` and `_BIMG_SOURCE` overrides
+select local trees. The former `_BGFX`, `_BX` and `_BIMG` override names remain
+supported; nonempty overrides using the new names take precedence over them.
 The root always uses the tracked wrapper, not a wrapper-source override.
 See the [wrapper documentation](Dependencies/bgfx.cmake/README.md) for precedence,
 disconnected builds and Git-free source packaging.

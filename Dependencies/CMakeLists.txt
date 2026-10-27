@@ -57,38 +57,10 @@ if(WIN32 AND NOT DEFINED BIMG_CONFIG_USE_WIC)
     set(BIMG_CONFIG_USE_WIC ON)
 endif()
 
-# Supply Babylon Native's selected sources before entering the upstream wrapper.
-foreach(_bgfx_dependency IN ITEMS bx bimg bgfx)
-    string(TOUPPER "${_bgfx_dependency}" _bgfx_upper)
-    set(_bgfx_root "${_bgfx_upper}_DIR")
-    set(_bgfx_override "FETCHCONTENT_SOURCE_DIR_${_bgfx_upper}")
-    if(NOT "${${_bgfx_root}}" STREQUAL "")
-        file(REAL_PATH "${${_bgfx_root}}" _bgfx_selected BASE_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/bgfx.cmake")
-    elseif("${${_bgfx_override}}" STREQUAL "" AND
-           EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/bgfx.cmake/${_bgfx_dependency}/include/${_bgfx_dependency}/${_bgfx_dependency}.h")
-        set(_bgfx_selected "${CMAKE_CURRENT_SOURCE_DIR}/bgfx.cmake/${_bgfx_dependency}")
-    else()
-        FetchContent_MakeAvailable(${_bgfx_dependency})
-        FetchContent_GetProperties(${_bgfx_dependency} SOURCE_DIR _bgfx_selected)
-        file(REAL_PATH "${_bgfx_selected}" _bgfx_selected)
-    endif()
-
-    if(_bgfx_dependency STREQUAL "bgfx")
-        set(_bgfx_sentinels include/bgfx/bgfx.h src/bgfx.cpp scripts/bgfx.idl)
-    elseif(_bgfx_dependency STREQUAL "bx")
-        set(_bgfx_sentinels include/bx/bx.h src/bx.cpp)
-    else()
-        set(_bgfx_sentinels include/bimg/bimg.h src/image.cpp)
-    endif()
-    foreach(_bgfx_sentinel IN LISTS _bgfx_sentinels)
-        if(NOT EXISTS "${_bgfx_selected}/${_bgfx_sentinel}")
-            message(FATAL_ERROR "${_bgfx_root}: '${_bgfx_selected}' is not a valid ${_bgfx_dependency} source tree (missing ${_bgfx_sentinel}). Supply sources before configuring disconnected builds.")
-        endif()
-    endforeach()
-    set(${_bgfx_root} "${_bgfx_selected}")
-endforeach()
-
 add_subdirectory(bgfx.cmake EXCLUDE_FROM_ALL)
+foreach(_bgfx_variable BGFX_DIR BX_DIR BIMG_DIR)
+    get_directory_property(${_bgfx_variable} DIRECTORY bgfx.cmake DEFINITION ${_bgfx_variable})
+endforeach()
 get_directory_property(BGFX_PROJECT_VERSION DIRECTORY bgfx.cmake DEFINITION PROJECT_VERSION)
 if(BABYLON_NATIVE_BUILD_SOURCETREE)
     include(cmake/StageBgfxSources.cmake)
@@ -264,7 +236,7 @@ if(BABYLON_NATIVE_PLUGIN_NATIVEMESHOPT AND NOT TARGET meshoptimizer)
 endif()
 
 # --------------------------------------------------
-# googletest
+# Component tests
 # --------------------------------------------------
 set(URLLIB_TESTS OFF)
 set(JSRUNTIMEHOST_TESTS OFF)

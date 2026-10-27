@@ -30,10 +30,12 @@ integration change, not a new history import: the original import tip and
 commit map above remain unchanged. The three child revisions above track the
 source-pin update in BabylonNative [#1961](https://github.com/BabylonJS/BabylonNative/pull/1961),
 independently of the wrapper's fallback pins. BabylonNative's declarations
-remain in the repository root `CMakeLists.txt`; selection, source validation
-and target adjustments live in `Dependencies/CMakeLists.txt`. They supply all
-three source roots before entering the upstream wrapper, bypassing its fallback
-pins. Source-tree staging lives in `Dependencies/cmake/StageBgfxSources.cmake`.
+remain in the repository root `CMakeLists.txt` using the upstream `bx_source`,
+`bimg_source` and `bgfx_source` content names. FetchContent's first declaration
+wins, so the upstream wrapper selects sources with BabylonNative's pins instead
+of its fallback pins. Legacy source overrides are forwarded to the new names;
+target adjustments live in `Dependencies/CMakeLists.txt`. Source-tree staging
+lives in `Dependencies/cmake/StageBgfxSources.cmake`.
 The obsolete `cmake/babylon-native.cmake` integration file was removed. The
 generic `cmake/version.cmake` adaptation still supports selected-source
 versioning and Git-free packages; the rest of the wrapper is not claimed to

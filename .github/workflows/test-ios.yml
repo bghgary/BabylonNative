@@ -13,8 +13,8 @@ jobs:
         run: sudo xcode-select --switch /Applications/Xcode_26.4.app/Contents/Developer
       - uses: actions/download-artifact@v7
         with:
-          pattern: UnitTests-iOS-JsRuntimeHost-*
-          path: test-artifacts
+          name: UnitTests-iOS-JsRuntimeHost-JavaScriptCore
+          path: test-artifacts/UnitTests-iOS-JsRuntimeHost-JavaScriptCore
       - name: Boot iOS simulator
         id: simulator
         uses: futureware-tech/simulator-action@v5
