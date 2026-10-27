@@ -53,5 +53,6 @@ jobs:
       - name: Build unit-test artifacts
         uses: ./.github/actions/build-mobile-tests
         with:
+          component: JsRuntimeHost
           platform: iOS
           deployment-target: ${{ inputs.deployment-target }}

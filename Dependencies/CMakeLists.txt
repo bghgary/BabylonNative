@@ -245,7 +245,14 @@ if(BABYLON_NATIVE_BUILD_APPS AND ((WIN32 AND NOT WINDOWS_STORE) OR (APPLE AND NO
         set(URLLIB_TESTS ON)
     endif()
     set(JSRUNTIMEHOST_TESTS ON)
+endif()
 
+# --------------------------------------------------
+# googletest
+# --------------------------------------------------
+# Shared by BabylonNative's unit tests and the component tests; JSRUNTIMEHOST_TESTS
+# is enabled on every platform that builds any of them.
+if(JSRUNTIMEHOST_TESTS)
     if(WIN32)
         # For Windows: Prevent overriding the parent project's compiler/linker settings
         # Default build type for my test projects are /MDd (MultiThreaded DLL) but GTests default to /MTd (MultiTreaded)

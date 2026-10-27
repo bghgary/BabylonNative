@@ -82,6 +82,7 @@ jobs:
       - name: Build unit-test artifacts
         uses: ./.github/actions/build-mobile-tests
         with:
+          component: JsRuntimeHost
           platform: Android
           js-engine: ${{ inputs.js-engine }}
 

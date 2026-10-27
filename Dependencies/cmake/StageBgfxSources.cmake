@@ -52,9 +52,4 @@ function(bgfx_stage_sources wrapper destination)
 			file(COPY "${selected}/" DESTINATION "${target}" PATTERN ".git" EXCLUDE)
 		endif()
 	endforeach()
-
-	# Snapshot the selected source version, never rewrite its src/version.h.
-	include("${wrapper}/cmake/version.cmake")
-	file(WRITE "${destination}/bgfx/.bgfx-cmake-version"
-		"api=${BGFX_API_VERSION}\nrevision=${BGFX_REV_NUMBER}\nsha=${BGFX_REV}\n")
 endfunction()

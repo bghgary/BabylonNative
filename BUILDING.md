@@ -28,8 +28,8 @@ only its pinned bgfx, bx and bimg sources. Default child roots remain under
 select local trees. The former `_BGFX`, `_BX` and `_BIMG` override names remain
 supported; nonempty overrides using the new names take precedence over them.
 The root always uses the tracked wrapper, not a wrapper-source override.
-See the [wrapper documentation](Dependencies/bgfx.cmake/README.md) for precedence,
-disconnected builds and Git-free source packaging.
+See the [wrapper integration notes](Dependencies/bgfx.cmake/UPSTREAM.md#babylonnative-integration)
+for source selection and source-tree packaging.
 
 AndroidExtensions, CMakeExtensions, JsRuntimeHost and UrlLib are vendored with
 their history under `Dependencies/`. The root includes CMakeExtensions as a shared

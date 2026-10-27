@@ -1,70 +1,24 @@
 # bgfx.cmake
+[![Build Status](https://github.com/bkaradzic/bgfx.cmake/workflows/Release/badge.svg)](https://github.com/bkaradzic/bgfx.cmake/workflows/Release/badge.svg)
 
 **NOTE: This port only made to be used as C++ library, some features (such as bindings) might not work! For those features, please use original repo with GENie instead.**
 
-This directory contains the in-tree Babylon Native CMake wrapper for bgfx,
-imported with full file history from BabylonJS/bgfx.cmake. See
-[UPSTREAM.md](UPSTREAM.md) for provenance, licenses and exact source pins.
-Only the wrapper is vendored; bgfx, bx and bimg are still external sources.
+This repo contains cmake configuration files that can be used to build bgfx with CMake.
 
 ## Building
 
 CMake 3.21 or newer is required.
 
-```powershell
-git clone https://github.com/BabylonJS/BabylonNative.git
-Set-Location BabylonNative
-cmake -S Dependencies\bgfx.cmake -B build\bgfx -DBGFX_BUILD_EXAMPLES=OFF
-cmake --build build\bgfx --config Release
+```bash
+git clone https://github.com/bkaradzic/bgfx.cmake.git
+cd bgfx.cmake
+cmake -S. -Bcmake-build # $CMakeOptions
+cmake --build cmake-build
 ```
 
-The entrypoint `CMakeLists.txt` and `cmake/dependencies.cmake` are unchanged
-copies from `bkaradzic/bgfx.cmake@dbc15d21e7744887d543d0c80278fe26fbb0f5f0`.
-Standalone configuration uses that upstream resolver and its fallback revisions,
-with default sources in `${FETCHCONTENT_BASE_DIR}/{bgfx,bx,bimg}_source-src`.
-Pass `BGFX_DIR`, `BX_DIR` and `BIMG_DIR` to build other selected source trees.
+Configure uses CMake FetchContent to download the pinned bx, bimg and bgfx revisions into the build directory. A network connection and Git are required for the default build. Subsequent configurations reuse the downloaded sources.
 
-Babylon Native's root does not use those fallback revisions. Its
-[`root declarations`](../../CMakeLists.txt) use the upstream `bx_source`,
-`bimg_source` and `bgfx_source` content names with Babylon Native's compatible
-pins, so the wrapper's later declarations do not replace them.
-[`../CMakeLists.txt`](../CMakeLists.txt) adds the tracked wrapper with
-`add_subdirectory`; it never downloads the wrapper. Default child sources remain under
-`${FETCHCONTENT_BASE_DIR}/bgfx.cmake-src/{bgfx,bx,bimg}`.
-
-For the Babylon Native build, source precedence is nonempty
-`BGFX_DIR`/`BX_DIR`/`BIMG_DIR`, valid adjacent bundled directories, then
-`FETCHCONTENT_SOURCE_DIR_BGFX_SOURCE`/`_BX_SOURCE`/`_BIMG_SOURCE` overrides
-or pinned FetchContent acquisition. The root forwards legacy
-`FETCHCONTENT_SOURCE_DIR_BGFX`/`_BX`/`_BIMG` overrides to the new names
-when the corresponding new override is empty. Explicit relative roots
-are relative to this wrapper, not the outer project. Invalid explicit roots
-fail instead of downloading replacements. Parent normal variables take
-precedence over cache values. Resolved managed roots are not cached as
-explicit overrides; they continue through FetchContent on each configure.
-A parent's earlier FetchContent declaration retains its usual precedence.
-
-`FETCHCONTENT_BASE_DIR`, `FETCHCONTENT_UPDATES_DISCONNECTED` (including its
-per-source variants) and `FETCHCONTENT_FULLY_DISCONNECTED` keep their CMake
-semantics. Fully disconnected builds need populated sources or source
-overrides in advance; there is no remote-wrapper fallback.
-
-Babylon Native's `BABYLON_NATIVE_BUILD_SOURCETREE=ON` stages the current
-wrapper beside the selected children in `_deps/bgfx.cmake-src`. Existing
-packagers can copy this directory, strip Git metadata and configure it
-directly as a standalone CMake project for an offline build.
-Custom selected child roots are copied into the package without modifying
-the originals.
-The staging implementation belongs to Babylon Native in
-[`../cmake/StageBgfxSources.cmake`](../cmake/StageBgfxSources.cmake), not to the
-upstream wrapper.
-
-Versions use the selected bgfx API and its own Git commit count, never an
-ancestor repository's history. Source packages snapshot that version in
-`bgfx/.bgfx-cmake-version`. Plain archives fall back to their checked-in
-`src/version.h` (which may describe a different historical revision), then
-revision 0 with a warning if no revision metadata exists. Configuration
-never rewrites a source tree's `src/version.h`.
+For offline builds, supply local source trees with `BX_DIR`, `BIMG_DIR` and `BGFX_DIR` (absolute paths or paths relative to this repository), or unpack bx, bimg and bgfx into the repository root. Each dependency can be overridden independently. Release source archives already include these folders. `FETCHCONTENT_SOURCE_DIR_BX_SOURCE`, `FETCHCONTENT_SOURCE_DIR_BIMG_SOURCE` and `FETCHCONTENT_SOURCE_DIR_BGFX_SOURCE` also override fetched sources; a parent project can provide FetchContent declarations named `bx_source`, `bimg_source` and `bgfx_source` before adding this project. The distinct upstream names allow a parent to declare and populate this wrapper itself as `bgfx`.
 
 Apple universal builds containing x86 slices require Xcode 14+ (or upstream Clang 14+) for scoped unused-argument handling of the architecture-specific SSE4.2 options.
 
@@ -201,8 +155,5 @@ const bgfx::EmbeddedShader k_vs = BGFX_EMBEDDED_SHADER(vs);
 const bgfx::EmbeddedShader k_fs = BGFX_EMBEDDED_SHADER(fs);
 ```
 
-## Source updates
-
-Source updates are deliberate pin changes, not implicit upgrades. Reconfigure
-managed sources after changing a pin; explicit external trees remain untouched.
-Keep wrapper updates and source updates separate as described in `UPSTREAM.md`.
+## Does this work with latest bx/bgfx/bimg?
+Probably! This project needs to be updated if a dependency is added or the bgfx build system changes. The bgfx repository is very active but these types of changes are rare. New examples have to be added manually as well, but not doing so will merely result in that example not showing up and won't break anything else. If pulling latest causes issues, be sure to manually reconfigure CMake as the glob patterns may need to be refreshed (the use of glob patterns in CMake is generally discouraged but in this project it helps to ensure upwards compatibilty with newer bgfx updates).

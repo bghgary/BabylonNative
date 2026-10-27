@@ -15,9 +15,8 @@ Targets and lateral dependency relationships are unchanged. The legacy
 `_deps/bgfx.cmake-src` source packages remain supported; the wrapper's
 build files now live under `Dependencies/bgfx.cmake`. See
 [Building](../BUILDING.md) for local/offline source overrides.
-The bgfx wrapper's `CMakeLists.txt` and `cmake/dependencies.cmake` are copied
-unchanged from upstream. Babylon Native's options and target adjustments live
-in `Dependencies/CMakeLists.txt`; source-tree
+The bgfx wrapper is an unchanged copy of upstream. Babylon Native's options and
+target adjustments live in `Dependencies/CMakeLists.txt`; source-tree
 packaging lives in `Dependencies/cmake/StageBgfxSources.cmake`. The root's
 `bx_source`, `bimg_source` and `bgfx_source` FetchContent declarations retain
 Babylon Native's compatible child revisions. The upstream wrapper selects the
@@ -47,8 +46,9 @@ the JsRuntimeHost test application using `.github/actions/build-mobile-tests`.
 There are no separate component build matrices or artifact-producer jobs.
 JsRuntimeHost retains its existing Android and iOS test harnesses, with a
 separate CMake build directory for the iOS simulator application.
-Component/platform configure and build steps are separate from CI packaging
-and artifact upload steps.
+The action selects each component/platform test project in one place; shared
+steps configure, build, package and upload it, so another suite only needs a
+new project entry and another action invocation.
 Artifact names identify the platform and engine:
 `UnitTests-Android-JsRuntimeHost-<engine>` and
 `UnitTests-iOS-JsRuntimeHost-JavaScriptCore`. iOS apps are archived to retain

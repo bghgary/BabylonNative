@@ -23,23 +23,36 @@ The former gitlinks now correspond to pinned CMake source acquisitions:
 | bx | https://github.com/bkaradzic/bx | `f3a9adb603c5677731e7cf10622fa16e1dfe9ea5` |
 | bimg | https://github.com/bkaradzic/bimg | `9bfbd6493b48a15238f2d1374a718ec026524515` |
 
-The wrapper's `CMakeLists.txt` and `cmake/dependencies.cmake` are unchanged
-copies from https://github.com/bkaradzic/bgfx.cmake at
+Apart from this file, `UPSTREAM_COMMIT_MAP.txt` and the excluded `.github`
+directory, the wrapper is an unchanged copy of
+https://github.com/bkaradzic/bgfx.cmake at
 `dbc15d21e7744887d543d0c80278fe26fbb0f5f0`. This is a BabylonNative
 integration change, not a new history import: the original import tip and
 commit map above remain unchanged. The three child revisions above track the
 source-pin update in BabylonNative [#1961](https://github.com/BabylonJS/BabylonNative/pull/1961),
-independently of the wrapper's fallback pins. BabylonNative's declarations
-remain in the repository root `CMakeLists.txt` using the upstream `bx_source`,
-`bimg_source` and `bgfx_source` content names. FetchContent's first declaration
-wins, so the upstream wrapper selects sources with BabylonNative's pins instead
-of its fallback pins. Legacy source overrides are forwarded to the new names;
-target adjustments live in `Dependencies/CMakeLists.txt`. Source-tree staging
-lives in `Dependencies/cmake/StageBgfxSources.cmake`.
-The obsolete `cmake/babylon-native.cmake` integration file was removed. The
-generic `cmake/version.cmake` adaptation still supports selected-source
-versioning and Git-free packages; the rest of the wrapper is not claimed to
-be an unchanged upstream snapshot.
+independently of the wrapper's fallback pins. The obsolete
+`cmake/babylon-native.cmake` integration file was removed.
+
+## BabylonNative integration
+
+All BabylonNative-specific source selection and packaging lives outside this
+directory:
+
+- The repository root `CMakeLists.txt` declares `bx_source`, `bimg_source` and
+  `bgfx_source` with BabylonNative's pins and default source directories under
+  `${FETCHCONTENT_BASE_DIR}/bgfx.cmake-src/{bgfx,bx,bimg}`. FetchContent's first
+  declaration wins, so the wrapper selects those sources instead of its fallback
+  pins. The root also forwards the legacy `FETCHCONTENT_SOURCE_DIR_BGFX`, `_BX`
+  and `_BIMG` overrides to the `_SOURCE` names when those are empty.
+- `Dependencies/CMakeLists.txt` sets wrapper options, adds this directory with
+  `add_subdirectory` and adjusts the resulting targets.
+- `Dependencies/cmake/StageBgfxSources.cmake` stages this wrapper beside the
+  selected child sources in `_deps/bgfx.cmake-src` for
+  `BABYLON_NATIVE_BUILD_SOURCETREE=ON` packages, which can be configured directly
+  as a standalone offline build.
+
+`BGFX_DIR`, `BX_DIR` and `BIMG_DIR` keep the upstream wrapper's precedence and
+semantics described in [README.md](README.md).
 
 The upstream `.github` directory is excluded from the vendored working tree in
 a separate BabylonNative-only commit. All five files and their histories remain
