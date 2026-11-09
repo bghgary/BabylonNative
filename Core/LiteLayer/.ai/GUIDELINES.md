@@ -15,9 +15,19 @@ application-specialized compiler output or a smaller NativeEngine wrapper.
 - The only public header is `Include/babylon_lite.h`. Preserve its ABI, documented
   defaults, precision, ordering, identity, ownership and failure behavior.
   Contract changes require explicit review before implementation.
-- Current authority is Babylon Lite 1.32.0, source
-  `2e064d88ec7422af946f8ec7f089ac6519f99295`. An intentional version upgrade
-  must update the contract, provenance and parity tests together.
+- Current authority is **Babylon Lite master pinned at
+  `be579d69df9a0667ce9efeaf46a7e96b95295c7b`** (user decision, 2026-11-09),
+  together with its lockfile, assets and test goldens. It replaces 1.32.0
+  (`2e064d88ec7422af946f8ec7f089ac6519f99295`); code ported from 1.32.0 is a
+  migration baseline that must be requalified against the pin (the triage
+  lists the changed modules in
+  `Babylon-Lite-Native-AI/artifacts/lite-test-triage-master-v1/native-upgrade-rework.json`).
+  An intentional pin change must update the contract, provenance and parity
+  tests together.
+- Pin and re-sync rules: review new master commits weekly, read-only, through
+  week 5 of the release cycle; promote a new pin only at a bucket boundary after
+  the affected native and V8 tests and the full release profile pass again.
+  Freeze the pin on 2026-12-18; resync broadly only after the release.
 - Before designing an implementation, trace the reached Babylon Lite TypeScript
   bodies, shaders and callers at that pin. Preserve the original algorithms,
   CPU/GPU execution placement, data formats, precision stages, update triggers
@@ -408,11 +418,27 @@ For measurements and interaction with host agents:
 
 ## 8. Test-driven implementation and rewrite workflow
 
-Current priority (user decision, 2026-11-02): **cover the Babylon Lite API
-surface exercised by the bblitec test scenes**. For each missing API:
+Current priority (user decision, 2026-11-09): **test-driven, bucket-based
+development using Babylon Lite's own tests at the pinned master commit.** The
+tests are triaged into feature buckets in
+`Babylon-Lite-Native-AI/artifacts/lite-test-triage-master-v1` (posted to
+BabylonJS/ThePirateCove#1979). Implement all features of one bucket, make that
+bucket's eligible tests pass natively (public API lane via the JS projection on
+V8, internal lane as C++ ports, parity lane through LiteScenes with Lite's own
+references and comparison rules), then move to the next bucket. Report strict
+pass / all eligible cases per bucket, native and V8 separately; unimplemented,
+blocked, skipped and expected-fail tests stay visible and are never passes. Do
+not move tests between buckets, auto-regenerate missing references or raise
+thresholds to reach 100%. The first-release (end of 2026) gate is the core
+profile recorded in that triage: code-built scene, static glTF/GLB with basic
+PBR and textures, rendered natively.
+
+Earlier priority (user decision, 2026-11-02, still applies to performance):
+**cover the Babylon Lite API surface exercised by the bblitec test scenes**.
+For each missing API:
 
 - Implement it natively in LiteLayer, following this policy and the original
-  Babylon Lite 1.32.0 bodies/shaders.
+  Babylon Lite bodies/shaders at the current pin.
 - Implement its JS projection.
 - Measure it against the bblitec implementation of the same scene. Native must
   be equal or faster in **steady-state frame time** (mean and P95); record
@@ -441,7 +467,7 @@ GPU-retirement safety throughout.
 The clarified completion target is core glTF 2.0 plus the extension set supported
 by Babylon.js. Pin the comparison to Babylon.js 9.30.0, release source
 `b248b370267f13bfaf5b2a0f8fd525bad7c99b52`, rather than a moving branch.
-This compatibility target does not replace the Lite 1.32.0 API/source authority
+This compatibility target does not replace the pinned Lite API/source authority
 or authorize copying NativeEngine bodies. Preserve original Lite semantics and
 review additions/adaptations explicitly. The sandbox must load every animation
 clip, automatically play the first clip and provide clip selection; these are
