@@ -5,7 +5,9 @@ root="$PWD"
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 REAL_TIMEOUT="$(command -v gtimeout || command -v timeout)"
 REAL_TAIL="$(command -v gtail || command -v tail)"
-export REAL_TIMEOUT REAL_TAIL
+REAL_CP="$(command -v cp)"
+REAL_CAT="$(command -v cat)"
+export REAL_TIMEOUT REAL_TAIL REAL_CP REAL_CAT
 fixture="$(mktemp -d "$root/.ios capture test.XXXXXXXX")"
 cleanup() {
     rm -f "$fixture/bin/xcrun" "$fixture/bin/gtimeout" "$fixture/bin/gtail" "$fixture/bin/cp" "$fixture/bin/cat" \
@@ -42,7 +44,7 @@ if [[ "$MOCK_SCENARIO" == "copy-error" && "$1" == */stderr.log ]]; then
     echo "simulated copy failure" >&2
     exit 1
 fi
-exec /usr/bin/cp "$@"
+exec "$REAL_CP" "$@"
 EOF
 cat >"$fixture/bin/cat" <<'EOF'
 #!/usr/bin/env bash
@@ -50,7 +52,7 @@ if [[ "$MOCK_SCENARIO" == "launcher-copy-error" && "${1:-}" == */launcher.log ]]
     echo "simulated launcher output failure" >&2
     exit 1
 fi
-exec /usr/bin/cat "$@"
+exec "$REAL_CAT" "$@"
 EOF
 cat >"$fixture/bin/xcrun" <<'EOF'
 #!/usr/bin/env bash
