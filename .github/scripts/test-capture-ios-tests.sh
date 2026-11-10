@@ -8,12 +8,12 @@ REAL_TAIL="$(command -v gtail || command -v tail)"
 export REAL_TIMEOUT REAL_TAIL
 fixture="$(mktemp -d "$root/.ios capture test.XXXXXXXX")"
 cleanup() {
-    rm -f "$fixture/bin/xcrun" "$fixture/bin/gtimeout" "$fixture/bin/gtail" "$fixture/bin/cp" \
+    rm -f "$fixture/bin/xcrun" "$fixture/bin/gtimeout" "$fixture/bin/gtail" "$fixture/bin/cp" "$fixture/bin/cat" \
         "$fixture/pid" "$fixture/terminations"
     rm -f "$fixture"/results/*
     for capture in "$fixture"/container/Documents/bn-ios-tests.*; do
         if [[ -d "$capture" ]]; then
-            rm -f "$capture/stdout.log" "$capture/stderr.log"
+            rm -f "$capture/stdout.log" "$capture/stderr.log" "$capture/launcher.log"
             rmdir "$capture"
         fi
     done
@@ -43,6 +43,14 @@ if [[ "$MOCK_SCENARIO" == "copy-error" && "$1" == */stderr.log ]]; then
     exit 1
 fi
 exec /usr/bin/cp "$@"
+EOF
+cat >"$fixture/bin/cat" <<'EOF'
+#!/usr/bin/env bash
+if [[ "$MOCK_SCENARIO" == "launcher-copy-error" && "${1:-}" == */launcher.log ]]; then
+    echo "simulated launcher output failure" >&2
+    exit 1
+fi
+exec /usr/bin/cat "$@"
 EOF
 cat >"$fixture/bin/xcrun" <<'EOF'
 #!/usr/bin/env bash
@@ -144,7 +152,7 @@ case "$2" in
         ;;
 esac
 EOF
-chmod +x "$fixture/bin/xcrun" "$fixture/bin/gtimeout" "$fixture/bin/gtail" "$fixture/bin/cp"
+chmod +x "$fixture/bin/xcrun" "$fixture/bin/gtimeout" "$fixture/bin/gtail" "$fixture/bin/cp" "$fixture/bin/cat"
 
 run_case() {
     local scenario="$1" expected="$2" duration="${3:-5s}"
@@ -183,6 +191,11 @@ for scenario in normal fast marker-whitespace; do
     grep -q 'Running 30 tests' "$fixture/results/$scenario.stdout.log"
     grep -q '\[ PASSED \] 30 tests' "$fixture/results/$scenario.stdout.log"
     marker_is_zero "$fixture/results/$scenario.stderr.log"
+    pid="$(cat "$fixture/pid")"
+    if [[ "$(tail -n 1 "$fixture/results/$scenario.stdout.log")" != "example.test: $pid" ]]; then
+        echo "$scenario: missing launcher PID in stdout artifact" >&2
+        exit 1
+    fi
 done
 
 for scenario in test-failure missing-marker after-marker; do
@@ -196,6 +209,8 @@ done
 run_case missing-stderr 1
 run_case missing-stdout 1
 run_case copy-error 1
+run_case launcher-copy-error 1
+grep -q 'Could not retrieve simulator launcher output' "$fixture/results/launcher-copy-error.output"
 run_case malformed 1
 run_case invalid-pid 1
 run_case extra-output 1

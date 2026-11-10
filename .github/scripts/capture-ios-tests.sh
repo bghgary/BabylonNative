@@ -30,7 +30,8 @@ container="$(gtimeout 120s xcrun simctl get_app_container "$simulator" "$applica
 capture="$(mktemp -d "$container/Documents/bn-ios-tests.XXXXXXXX")"
 
 status=0
-gtimeout "$duration" bash "$0" --launch "$simulator" "$application" "$capture" || status=$?
+gtimeout "$duration" bash "$0" --launch "$simulator" "$application" "$capture" \
+    > "$capture/launcher.log" || status=$?
 echo "Simulator launch and app wait status: $status"
 
 if (( status != 0 )); then
@@ -49,6 +50,13 @@ for stream in stdout stderr; do
 done
 
 if [[ -f "$output_prefix.stdout.log" ]]; then
+    # Preserve the launcher PID in the saved output for simulator diagnostics.
+    if ! cat "$capture/launcher.log" >> "$output_prefix.stdout.log"; then
+        echo "Could not retrieve simulator launcher output" >&2
+        if (( status == 0 )); then
+            status=1
+        fi
+    fi
     cat "$output_prefix.stdout.log"
 fi
 if [[ -f "$output_prefix.stderr.log" ]]; then
