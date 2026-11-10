@@ -41,7 +41,7 @@
 
 - (void) close 
 {
-    [self invalidateAndCancelWithCloseCode:1000 reason:[NSString stringWithUTF8String:"Normal close."]];
+    [self invalidateAndCancelWithCloseCode:1000 reason:[NSString stringWithUTF8String:"Normal close."] source:@"close" error:nil];
 }
 
 - (void) sendMessage:(NSString*)message
@@ -59,7 +59,7 @@
     {
         if (error) 
         {
-            [self invalidateAndCancelWithCloseCode:1006 reason:[error localizedDescription]];
+            [self invalidateAndCancelWithCloseCode:1006 reason:[error localizedDescription] source:@"send" error:error];
         }
     }];
 }
@@ -79,7 +79,7 @@
     {
         if (error) 
         {
-            [self invalidateAndCancelWithCloseCode:1006 reason:[error localizedDescription]];
+            [self invalidateAndCancelWithCloseCode:1006 reason:[error localizedDescription] source:@"receive" error:error];
             return;
         }
         else if (message.type == NSURLSessionWebSocketMessageTypeString)
@@ -117,19 +117,19 @@
 {
     if (error)
     {
-        [self invalidateAndCancelWithCloseCode:1006 reason:[error localizedDescription]];
+        [self invalidateAndCancelWithCloseCode:1006 reason:[error localizedDescription] source:@"task completion" error:error];
     }
 }
 
 - (void)URLSession:(NSURLSession*)session webSocketTask:(NSURLSessionWebSocketTask*)webSocketTask didCloseWithCloseCode:(NSInteger)code reason:(NSData*)reason  API_AVAILABLE(ios(13.0))
 {
     NSString* reasonStr = [[NSString alloc] initWithData:reason encoding:NSUTF8StringEncoding];
-    [self invalidateAndCancelWithCloseCode:(int)code reason:reasonStr];
+    [self invalidateAndCancelWithCloseCode:(int)code reason:reasonStr source:@"close callback" error:nil];
 }
 
 // Close-once helper. Fires onError for abnormal codes, then onClose exactly once.
 // Callbacks are invoked outside the lock to avoid reentrancy issues.
-- (void)invalidateAndCancelWithCloseCode:(int)code reason:(NSString*) reason
+- (void)invalidateAndCancelWithCloseCode:(int)code reason:(NSString*) reason source:(NSString*)source error:(NSError*)error
 {
     NSURLSession* sessionToInvalidate;
     void (^errorCb)(NSString*);
@@ -146,6 +146,13 @@
         session = nil;
         errorCb = (code != 1000) ? errorCallback : nil;
         closeCb = closeCallback;
+    }
+
+    if (code != 1000)
+    {
+        NSError* underlying = error.userInfo[NSUnderlyingErrorKey];
+        NSLog(@"WebSocket close from %@: code %d, error %@ %ld, underlying %@ %ld",
+            source, code, error.domain, (long)error.code, underlying.domain, (long)underlying.code);
     }
 
     [sessionToInvalidate invalidateAndCancel];
