@@ -7,6 +7,10 @@ on:
         type: string
         required: false
         default: ''
+      logger-comparison:
+        type: string
+        required: false
+        default: ''
 
 jobs:
   test:
@@ -32,8 +36,19 @@ jobs:
       - name: Install and run iOS JsRuntimeHost tests
         env:
           SIMULATOR: ${{ steps.simulator.outputs.udid }}
+          LOGGER_COMPARISON: ${{ inputs.logger-comparison }}
         run: |
           set -euo pipefail
+          expected_tests=
+          case "$LOGGER_COMPARISON" in
+            '') ;;
+            full) expected_tests=30 ;;
+            filtered)
+              export SIMCTL_CHILD_GTEST_FILTER='-StandardStreamLogger.*'
+              expected_tests=29
+              ;;
+            *) echo "::error::Invalid logger comparison mode"; exit 1 ;;
+          esac
           mkdir -p test-results
           shopt -s nullglob
           artifacts=(test-artifacts/*)
@@ -55,6 +70,23 @@ jobs:
           cat "test-results/$name.stderr.log" >&2
           test "$status" -eq 0
           tail -n 1 "test-results/$name.stderr.log" | tr -d '\r ' | grep -x 0
+          if [[ -n "$expected_tests" ]]; then
+            grep -Fq "[==========] Running $expected_tests tests" "test-results/$name.stdout.log" \
+              || { echo "::error::Unexpected test count"; exit 1; }
+            grep -Fq "[  PASSED  ] $expected_tests tests." "test-results/$name.stdout.log" \
+              || { echo "::error::Missing passing test summary"; exit 1; }
+            if [[ "$LOGGER_COMPARISON" == filtered ]]; then
+              grep -Fq 'Note: Google Test filter = -StandardStreamLogger.*' "test-results/$name.stdout.log" \
+                || { echo "::error::Missing stream-logger filter"; exit 1; }
+              if grep -Fq '[ RUN      ] StandardStreamLogger.Lifecycle' "test-results/$name.stdout.log"; then
+                echo "::error::The stream-logger test ran despite the filter"
+                exit 1
+              fi
+            else
+              grep -Fq '[ RUN      ] StandardStreamLogger.Lifecycle' "test-results/$name.stdout.log" \
+                || { echo "::error::The stream-logger test did not run"; exit 1; }
+            fi
+          fi
       - name: Collect iOS failure diagnostics
         if: ${{ failure() && steps.simulator.outputs.udid != '' }}
         env:
