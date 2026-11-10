@@ -22,8 +22,13 @@ jobs:
           model: 'iPhone 17'
           os_version: '>=26.0'
           wait_for_boot: true
-      - name: Ensure per-suite timeout tool
-        run: command -v gtimeout || brew install coreutils
+      - name: Ensure GNU core utilities
+        run: |
+          if ! command -v gtimeout || ! command -v gtail; then
+            brew install coreutils
+          fi
+      - name: Test iOS output capture
+        run: bash .github/scripts/test-capture-ios-tests.sh
       - name: Install and run iOS JsRuntimeHost tests
         env:
           SIMULATOR: ${{ steps.simulator.outputs.udid }}
@@ -42,14 +47,7 @@ jobs:
           test -d "$directory/$app"
           gtimeout 120s xcrun simctl install "$SIMULATOR" "$directory/$app"
           trap 'code=$?; gtimeout 120s xcrun simctl uninstall "$SIMULATOR" "$application" || code=1; exit "$code"' EXIT
-          status=0
-          gtimeout 20m xcrun simctl launch --console "$SIMULATOR" "$application" \
-            > "test-results/$name.stdout.log" 2> "test-results/$name.stderr.log" || status=$?
-          echo "Simulator launch exit status: $status"
-          cat "test-results/$name.stdout.log"
-          cat "test-results/$name.stderr.log" >&2
-          test "$status" -eq 0
-          tail -n 1 "test-results/$name.stderr.log" | tr -d '\r ' | grep -x 0
+          bash .github/scripts/capture-ios-tests.sh "$SIMULATOR" "$application" "test-results/$name" 20m
       - name: Collect iOS failure diagnostics
         if: ${{ failure() && steps.simulator.outputs.udid != '' }}
         env:
