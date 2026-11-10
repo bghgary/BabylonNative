@@ -55,8 +55,8 @@ jobs:
           cat "test-results/$name.stderr.log" >&2
           test "$status" -eq 0
           tail -n 1 "test-results/$name.stderr.log" | tr -d '\r ' | grep -x 0
-      - name: Collect iOS failure diagnostics
-        if: ${{ failure() && steps.simulator.outputs.udid != '' }}
+      - name: Collect iOS stream diagnostics
+        if: ${{ !cancelled() && steps.simulator.outputs.udid != '' }}
         env:
           SIMULATOR: ${{ steps.simulator.outputs.udid }}
         run: |
@@ -68,6 +68,11 @@ jobs:
           gtimeout 120s xcrun simctl spawn "$SIMULATOR" log show --last 10m --style compact \
             --predicate 'process == "UnitTests" OR eventMessage CONTAINS "com.jsruntimehost.unittests"' \
             > test-results/diagnostics/simulator.log
+          pid=$(tr -d '\r' < test-results/UnitTests-iOS-JsRuntimeHost-JavaScriptCore.stdout.log | \
+            sed -nE 's/^com[.]jsruntimehost[.]unittests: ([0-9]+)$/\1/p' | tail -n 1)
+          [[ -n "$pid" ]] || { echo "::error::Could not identify the test app PID"; exit 1; }
+          grep -Fq "IOS_CONSOLE_PROBE_V1 pid=$pid " test-results/diagnostics/simulator.log || \
+            { echo "::error::No stream probe record for test app PID $pid"; exit 1; }
       - name: Upload test results
         if: ${{ !cancelled() && hashFiles('test-results/**') != '' }}
         uses: actions/upload-artifact@v6

@@ -3,7 +3,7 @@ name: iOS console reproduction
 on:
   push:
     branches:
-      - ios-console-repro
+      - ios-console-stream-probe
 
 jobs:
   build:
