@@ -55,6 +55,15 @@ jobs:
           cat "test-results/$name.stderr.log" >&2
           test "$status" -eq 0
           tail -n 1 "test-results/$name.stderr.log" | tr -d '\r ' | grep -x 0
+          stdout="test-results/$name.stdout.log"
+          grep -Fq '[==========] Running 30 tests' "$stdout" \
+            || { echo "::error::Unexpected test count"; exit 1; }
+          grep -Fq '[  PASSED  ] 30 tests.' "$stdout" \
+            || { echo "::error::Missing passing test summary"; exit 1; }
+          [[ "$(grep -c '^\[ RUN      \] ' "$stdout" || true)" -eq 30 ]] \
+            || { echo "::error::Expected 30 started tests"; exit 1; }
+          [[ "$(grep -c '^\[       OK \] ' "$stdout" || true)" -eq 30 ]] \
+            || { echo "::error::Expected 30 passed tests"; exit 1; }
       - name: Collect iOS stream diagnostics
         if: ${{ !cancelled() && steps.simulator.outputs.udid != '' }}
         env:
