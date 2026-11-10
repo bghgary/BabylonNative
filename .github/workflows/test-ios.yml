@@ -2,6 +2,11 @@ name: iOS unit tests
 
 on:
   workflow_call:
+    inputs:
+      artifact-suffix:
+        type: string
+        required: false
+        default: ''
 
 jobs:
   test:
@@ -67,6 +72,6 @@ jobs:
         if: ${{ !cancelled() && hashFiles('test-results/**') != '' }}
         uses: actions/upload-artifact@v6
         with:
-          name: iOS-unit-test-results
+          name: iOS-unit-test-results${{ inputs.artifact-suffix }}
           path: test-results
           if-no-files-found: error

@@ -1,0 +1,25 @@
+name: iOS console reproduction
+
+on:
+  push:
+    branches:
+      - ios-console-repro
+
+jobs:
+  build:
+    uses: ./.github/workflows/build-ios.yml
+    with:
+      deployment-target: '26.0'
+      xcode-version: '26.4'
+      runs-on: macos-26
+
+  test:
+    needs: build
+    strategy:
+      fail-fast: false
+      max-parallel: 4
+      matrix:
+        trial: ['01', '02', '03', '04', '05', '06', '07', '08', '09', '10']
+    uses: ./.github/workflows/test-ios.yml
+    with:
+      artifact-suffix: '-${{ matrix.trial }}'
