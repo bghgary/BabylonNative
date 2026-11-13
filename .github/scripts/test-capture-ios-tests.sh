@@ -10,8 +10,14 @@ REAL_CAT="$(command -v cat)"
 export REAL_TIMEOUT REAL_TAIL REAL_CP REAL_CAT
 fixture="$(mktemp -d "$root/.ios capture test.XXXXXXXX")"
 cleanup() {
+    if [[ "${MOCK_SCENARIO:-}" == "live-marker" && -f "$fixture/pid" ]]; then
+        pid="$(<"$fixture/pid")"
+        if kill -0 "$pid" 2>/dev/null; then
+            kill "$pid"
+        fi
+    fi
     rm -f "$fixture/bin/xcrun" "$fixture/bin/gtimeout" "$fixture/bin/gtail" "$fixture/bin/cp" "$fixture/bin/cat" \
-        "$fixture/pid" "$fixture/terminations"
+        "$fixture/pid" "$fixture/terminations" "$fixture/live-wait-status"
     rm -f "$fixture"/results/*
     for capture in "$fixture"/container/Documents/bn-ios-tests.*; do
         if [[ -d "$capture" ]]; then
@@ -22,6 +28,7 @@ cleanup() {
     rmdir "$fixture/bin" "$fixture/results" "$fixture/container/Documents" "$fixture/container" "$fixture"
 }
 trap cleanup EXIT
+trap 'echo "Control failed in ${MOCK_SCENARIO:-setup} at line $LINENO" >&2' ERR
 mkdir -p "$fixture/bin" "$fixture/results" "$fixture/container/Documents"
 export MOCK_ROOT="$fixture"
 export PATH="$fixture/bin:$PATH"
@@ -35,6 +42,27 @@ cat >"$fixture/bin/gtail" <<'EOF'
 if [[ "$MOCK_SCENARIO" == "wait-error" ]]; then
     echo "process wait failed" >&2
     exit 42
+fi
+if [[ "$MOCK_SCENARIO" == "live-marker" ]]; then
+    stdout="${!#}"
+    stderr="${stdout%stdout.log}stderr.log"
+    until [[ -s "$stderr" ]]; do
+        sleep 0.1
+    done
+    pid="$(<"$MOCK_ROOT/pid")"
+    if ! kill -0 "$pid" 2>/dev/null; then
+        echo "simulated app exited before the wait" >&2
+        exit 1
+    fi
+    # Start the short timeout only after the marker is present and the app is alive.
+    status=0
+    "$REAL_TIMEOUT" 1s "$REAL_TAIL" "$@" || status=$?
+    if ! kill -0 "$pid" 2>/dev/null; then
+        echo "simulated app exited during the wait" >&2
+        exit 1
+    fi
+    printf '%s\n' "$status" >"$MOCK_ROOT/live-wait-status"
+    exit "$status"
 fi
 exec "$REAL_TAIL" "$@"
 EOF
@@ -98,7 +126,11 @@ case "$2" in
                 printf "Running 30 tests\n" >>"$stdout"
             fi
             case "$scenario" in
-                live-marker|wait-error)
+                live-marker)
+                    printf "0\n" >>"$stderr"
+                    exec sleep 120
+                    ;;
+                wait-error)
                     printf "0\n" >>"$stderr"
                     exec sleep 2
                     ;;
@@ -143,6 +175,9 @@ case "$2" in
         if [[ -f "$MOCK_ROOT/pid" ]]; then
             [[ "$3" == "SIMULATOR" && "$4" == "example.test" ]]
             echo "$MOCK_SCENARIO" >>"$MOCK_ROOT/terminations"
+            if [[ "$MOCK_SCENARIO" == "live-marker" ]]; then
+                kill "$(<"$MOCK_ROOT/pid")"
+            fi
         else
             echo "no app to terminate" >&2
             exit 1
@@ -157,7 +192,7 @@ EOF
 chmod +x "$fixture/bin/xcrun" "$fixture/bin/gtimeout" "$fixture/bin/gtail" "$fixture/bin/cp" "$fixture/bin/cat"
 
 run_case() {
-    local scenario="$1" expected="$2" duration="${3:-5s}"
+    local scenario="$1" expected="$2" duration="${3:-60s}"
     export MOCK_SCENARIO="$scenario"
     rm -f "$fixture/pid"
     local status=0
@@ -218,7 +253,8 @@ run_case invalid-pid 1
 run_case extra-output 1
 run_case launch-error 45
 run_case wait-error 42
-run_case live-marker 124 1s
+run_case live-marker 124
+grep -qx '124' "$fixture/live-wait-status"
 marker_is_zero "$fixture/results/live-marker.stderr.log"
 grep -qx 'live-marker' "$fixture/terminations"
 echo "All simulator capture controls passed"
