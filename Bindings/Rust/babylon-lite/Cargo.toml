@@ -12,3 +12,9 @@ babylon-lite-sys = { path = "../babylon-lite-sys" }
 [dev-dependencies]
 winit = "0.30"
 raw-window-handle = "0.6"
+png = "0.17"
+
+[[example]]
+name = "minecraft"
+# Runs the port's oracle tests (digests from the original TypeScript) under `cargo test`.
+test = true

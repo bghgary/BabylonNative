@@ -100,6 +100,38 @@ fn arc_rotate_control_forwards_pointer_and_wheel_input() {
 }
 
 #[test]
+fn shader_material_declares_uniforms_and_rejects_unknown_ones() {
+    use babylon_lite::{ShaderMaterialOptions, ShaderUniform, UniformType, VertexAttribute};
+    let runtime = Runtime::new().unwrap();
+    let options = ShaderMaterialOptions {
+        name: "tint",
+        vertex_source: "@vertex fn mainVertex(input: VertexInput) -> @builtin(position) vec4<f32> { return shaderSystem.worldViewProjection * vec4<f32>(input.position, 1.0); }",
+        fragment_source: "@fragment fn mainFragment() -> @location(0) vec4<f32> { return vec4<f32>(shaderUniforms.tint, 1.0); }",
+        attributes: &[VertexAttribute::Position],
+        uniforms: &[
+            ShaderUniform::System("worldViewProjection"),
+            ShaderUniform::Custom {
+                name: "tint",
+                ty: UniformType::Vec3,
+                default: &[1.0, 0.0, 0.0],
+            },
+        ],
+        ..Default::default()
+    };
+    let material = runtime.create_shader_material(&options).unwrap();
+    material.set_vector3("tint", vec3(0.0, 1.0, 0.0)).unwrap();
+    let unknown = material.set_float("missing", 1.0).unwrap_err();
+    assert_eq!(
+        (unknown.status, unknown.source_error_code),
+        (Status::InvalidArgument, 400)
+    );
+    assert_eq!(
+        material.as_material().unwrap().as_shader().unwrap(),
+        material
+    );
+}
+
+#[test]
 fn error_detail_comes_only_from_the_failing_call() {
     let runtime = Runtime::new().unwrap();
     let light = runtime

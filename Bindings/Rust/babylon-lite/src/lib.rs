@@ -23,6 +23,8 @@ mod mesh;
 mod node;
 mod runtime;
 mod scene;
+mod shader_material;
+mod texture;
 
 pub use camera::{ArcRotateCamera, ArcRotateControl, Camera, FreeCamera, PointerEffects};
 pub use engine::{Engine, EngineOptions, EngineStats};
@@ -33,6 +35,10 @@ pub use mesh::{BoxOptions, GroundOptions, Mesh, MeshGeometry, SphereOptions};
 pub use node::SceneNode;
 pub use runtime::Runtime;
 pub use scene::Scene;
+pub use shader_material::{
+    BlendMode, ShaderMaterial, ShaderMaterialOptions, ShaderUniform, UniformType, VertexAttribute,
+};
+pub use texture::{AddressMode, FilterMode, PixelsTexture2DOptions, Texture2D, Texture2DInfo};
 
 /// Plain-old-data types shared with the C API.
 pub type Vec2 = sys::bl_Vec2;

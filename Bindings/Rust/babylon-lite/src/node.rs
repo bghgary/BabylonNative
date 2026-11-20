@@ -101,6 +101,12 @@ impl SceneNode {
             .call(|| unsafe { sys::bl_setNodeVisible(self.raw, visible) })
     }
 
+    /// Sets the visibility of this node and every descendant.
+    pub fn set_subtree_visible(&self, visible: bool) -> Result<()> {
+        self.runtime
+            .call(|| unsafe { sys::bl_setSubtreeVisible(self.raw, visible) })
+    }
+
     /// Column-major world matrix and its version, which changes whenever the
     /// matrix does.
     pub fn world_matrix(&self) -> Result<(Mat4, u64)> {
