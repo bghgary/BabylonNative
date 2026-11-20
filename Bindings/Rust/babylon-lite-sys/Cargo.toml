@@ -1,0 +1,12 @@
+[package]
+name = "babylon-lite-sys"
+description = "Raw FFI bindings to the Babylon Lite native C99 API (babylon_lite.h) and its runtime shader compiler."
+links = "babylon_lite"
+build = "build.rs"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+publish.workspace = true
+
+[build-dependencies]
+serde_json = "1"
